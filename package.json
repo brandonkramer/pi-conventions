@@ -1,0 +1,46 @@
+{
+  "name": "pi-conventions",
+  "version": "0.1.0",
+  "description": "Pi package for enforcing codebase conventions through structure and naming policies.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "conventions",
+    "structure",
+    "naming",
+    "architecture"
+  ],
+  "author": "Brandon",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "schemas",
+    "examples",
+    "skills",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "vitest": "^4.1.2"
+  }
+}

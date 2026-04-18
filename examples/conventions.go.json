@@ -1,0 +1,108 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Keep binaries in cmd/ and put most private implementation in internal/.",
+    "Use pkg/ only for packages meant for external consumers; most code should stay internal."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "internal/",
+        "pkg/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc",
+        "shared"
+      ],
+      "layers": [
+        {
+          "name": "handler",
+          "prefixes": [
+            "internal/handler/"
+          ],
+          "description": "HTTP, gRPC, or CLI-facing handlers"
+        },
+        {
+          "name": "service",
+          "prefixes": [
+            "internal/service/"
+          ],
+          "description": "business logic and orchestration"
+        },
+        {
+          "name": "repository",
+          "prefixes": [
+            "internal/repository/"
+          ],
+          "description": "data access and persistence adapters"
+        }
+      ],
+      "legacyZones": [
+        {
+          "prefixes": [
+            "internal/utils/",
+            "internal/helpers/",
+            "pkg/utils/",
+            "pkg/helpers/"
+          ],
+          "onCreate": "block",
+          "onEdit": "warn",
+          "reason": "Replace catch-all packages with packages named for what they do."
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      }
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "internal/",
+            "pkg/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "extensions": [
+            "go"
+          ],
+          "forbiddenNames": [
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Go source files should use short lowercase names; this guard blocks only generic catch-all names."
+        },
+        {
+          "prefixes": [
+            "internal/",
+            "pkg/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Go package directories should be named for their responsibility; avoid catch-all packages."
+        }
+      ]
+    }
+  }
+}

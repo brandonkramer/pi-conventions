@@ -1,0 +1,30 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Global baseline only. Add a project-local .pi/conventions.json for repo-specific rules.",
+    "Keep fallback conservative and mostly warn-level so it works across mixed-language projects."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "warn",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/",
+        "internal/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc"
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      },
+      "notes": [
+        "Avoid language-specific naming or framework-specific layer rules in the global fallback.",
+        "Use project-local conventions.json files for Rust, TypeScript, React, Go, Python, Astro, or Swift-specific conventions."
+      ]
+    }
+  }
+}

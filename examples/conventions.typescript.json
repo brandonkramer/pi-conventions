@@ -1,0 +1,137 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Assumes a modern ESM TypeScript app or package with a src/ layout and TS 6.0-era defaults.",
+    "Prefer features, lib, routes, and types over catch-all folders or deep framework-specific indirection."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc",
+        "shared"
+      ],
+      "layers": [
+        {
+          "name": "app",
+          "prefixes": [
+            "src/app/"
+          ],
+          "description": "application bootstrap, composition root, and runtime wiring"
+        },
+        {
+          "name": "features",
+          "prefixes": [
+            "src/features/"
+          ],
+          "description": "feature-scoped logic, UI, and public barrels"
+        },
+        {
+          "name": "routes",
+          "prefixes": [
+            "src/routes/"
+          ],
+          "description": "route definitions or request/transport entrypoints"
+        },
+        {
+          "name": "lib",
+          "prefixes": [
+            "src/lib/"
+          ],
+          "description": "shared support modules and reusable non-feature logic"
+        },
+        {
+          "name": "types",
+          "prefixes": [
+            "src/types/"
+          ],
+          "description": "shared declaration files and public types"
+        },
+        {
+          "name": "adapters",
+          "prefixes": [
+            "src/adapters/"
+          ],
+          "description": "API clients, persistence, and external boundaries"
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": true,
+        "mode": "block",
+        "allowedFiles": [
+          "src/index.ts",
+          "src/main.ts",
+          "src/app.ts",
+          "src/env.d.ts",
+          "src/vite-env.d.ts"
+        ],
+        "extensions": [
+          "ts",
+          "tsx",
+          "mts",
+          "cts",
+          "d.ts"
+        ]
+      }
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "src/app/",
+            "src/features/",
+            "src/routes/",
+            "src/lib/",
+            "src/types/",
+            "src/adapters/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "ts",
+            "tsx",
+            "mts",
+            "cts",
+            "d.ts"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Use responsibility-specific kebab-case source filenames."
+        },
+        {
+          "prefixes": [
+            "src/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "kebab-case",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Source directories should be responsibility-specific and kebab-case."
+        }
+      ]
+    }
+  }
+}

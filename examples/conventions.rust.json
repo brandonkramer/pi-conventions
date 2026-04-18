@@ -1,0 +1,128 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Use Rust 2024 idioms and prefer file-based modules over mod.rs for new code.",
+    "Keep shared contracts in smaller foundational modules and keep I/O boundaries at the edge."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc"
+      ],
+      "layers": [
+        {
+          "name": "kernel",
+          "prefixes": [
+            "src/kernel/"
+          ],
+          "description": "shared serializable models and narrow cross-slice contracts"
+        },
+        {
+          "name": "app",
+          "prefixes": [
+            "src/app/"
+          ],
+          "description": "workflow orchestration and task-level use cases"
+        },
+        {
+          "name": "domain",
+          "prefixes": [
+            "src/domain/"
+          ],
+          "description": "core reusable logic and domain models"
+        },
+        {
+          "name": "adapters",
+          "prefixes": [
+            "src/adapters/"
+          ],
+          "description": "storage, parsing, transport, and external boundaries"
+        },
+        {
+          "name": "transport",
+          "prefixes": [
+            "src/transport/"
+          ],
+          "description": "CLI, HTTP, TUI, or RPC entrypoints only"
+        }
+      ],
+      "legacyZones": [
+        {
+          "prefixes": [
+            "src/utils/",
+            "src/helpers/"
+          ],
+          "onCreate": "block",
+          "onEdit": "warn",
+          "reason": "Replace catch-all roots with responsibility-specific modules."
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": true,
+        "mode": "block",
+        "allowedFiles": [
+          "src/main.rs",
+          "src/lib.rs"
+        ],
+        "extensions": [
+          "rs"
+        ]
+      },
+      "notes": [
+        "Prefer new submodules under a declared layer or under src/bin/ for additional binaries instead of new top-level src/*.rs files."
+      ]
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "src/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "snake_case",
+          "extensions": [
+            "rs"
+          ],
+          "forbiddenNames": [
+            "mod",
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Rust module files should use descriptive snake_case names."
+        },
+        {
+          "prefixes": [
+            "src/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "snake_case",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Rust module directories should be responsibility-specific and snake_case."
+        }
+      ]
+    }
+  }
+}

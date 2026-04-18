@@ -1,0 +1,128 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Assumes a modern Swift Package Manager layout with Sources/<TargetName>/ and Tests/<TargetName>Tests/.",
+    "Prefer target-oriented structure and descriptive PascalCase source files over catch-all folders."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "Sources/",
+        "Tests/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc"
+      ],
+      "layers": [
+        {
+          "name": "App",
+          "prefixes": [
+            "Sources/App/"
+          ],
+          "description": "app entrypoint target and composition root"
+        },
+        {
+          "name": "Features",
+          "prefixes": [
+            "Sources/Features/"
+          ],
+          "description": "feature-focused SwiftUI or workflow targets"
+        },
+        {
+          "name": "Core",
+          "prefixes": [
+            "Sources/Core/"
+          ],
+          "description": "shared models, protocols, and pure domain logic"
+        },
+        {
+          "name": "Infrastructure",
+          "prefixes": [
+            "Sources/Infrastructure/"
+          ],
+          "description": "persistence, networking, and external boundaries"
+        },
+        {
+          "name": "DesignSystem",
+          "prefixes": [
+            "Sources/DesignSystem/"
+          ],
+          "description": "reusable UI components, styles, and theme primitives"
+        }
+      ],
+      "legacyZones": [
+        {
+          "prefixes": [
+            "Sources/utils/",
+            "Sources/helpers/",
+            "Tests/helpers/"
+          ],
+          "onCreate": "block",
+          "onEdit": "warn",
+          "reason": "Replace catch-all folders with target- or responsibility-specific modules."
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      },
+      "notes": [
+        "Adjust target names to match Package.swift. Keep one folder per target and let Tests/ mirror the target structure.",
+        "Do not fight legitimate SwiftPM directories like Sources/, Tests/, Resources/, or Plugins/."
+      ]
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "Sources/App/",
+            "Sources/Features/",
+            "Sources/Core/",
+            "Sources/Infrastructure/",
+            "Sources/DesignSystem/",
+            "Tests/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "PascalCase",
+          "extensions": [
+            "swift"
+          ],
+          "forbiddenNames": [
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Swift source files should use descriptive PascalCase names that usually match their primary type or responsibility."
+        },
+        {
+          "prefixes": [
+            "Sources/",
+            "Tests/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "PascalCase",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Swift target and source directories should use descriptive PascalCase names."
+        }
+      ]
+    }
+  }
+}

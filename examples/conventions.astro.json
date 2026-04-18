@@ -1,0 +1,214 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Assumes an Astro 6 project with pages, layouts, components, actions, content collections, and Tailwind v4-era styles.",
+    "Do not add strict naming rules for src/pages or src/actions because Astro routes and actions legitimately use index files and dynamic segments like [slug].astro."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc",
+        "shared"
+      ],
+      "layers": [
+        {
+          "name": "pages",
+          "prefixes": [
+            "src/pages/"
+          ],
+          "description": "file-based routes and page entrypoints"
+        },
+        {
+          "name": "layouts",
+          "prefixes": [
+            "src/layouts/"
+          ],
+          "description": "shared page shells and layout composition"
+        },
+        {
+          "name": "components",
+          "prefixes": [
+            "src/components/"
+          ],
+          "description": "reusable Astro components and islands"
+        },
+        {
+          "name": "actions",
+          "prefixes": [
+            "src/actions/"
+          ],
+          "description": "Astro Actions and server-side form or JSON handlers"
+        },
+        {
+          "name": "content",
+          "prefixes": [
+            "src/content/"
+          ],
+          "description": "content collections and structured content assets"
+        },
+        {
+          "name": "styles",
+          "prefixes": [
+            "src/styles/"
+          ],
+          "description": "global theme CSS and styling support files"
+        },
+        {
+          "name": "assets",
+          "prefixes": [
+            "src/assets/"
+          ],
+          "description": "processed images and local media assets"
+        },
+        {
+          "name": "icons",
+          "prefixes": [
+            "src/icons/"
+          ],
+          "description": "custom SVG icon assets"
+        },
+        {
+          "name": "lib",
+          "prefixes": [
+            "src/lib/"
+          ],
+          "description": "framework support modules and shared helpers"
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      },
+      "notes": [
+        "Allow Astro top-level support files such as src/content.config.ts and src/env.d.ts."
+      ]
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "src/components/",
+            "src/layouts/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "PascalCase",
+          "extensions": [
+            "astro"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Astro component and layout files should use descriptive PascalCase names."
+        },
+        {
+          "prefixes": [
+            "src/content/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "md",
+            "mdx",
+            "json",
+            "yaml",
+            "yml"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Content entries should use stable kebab-case slugs."
+        },
+        {
+          "prefixes": [
+            "src/icons/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "svg"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Custom icon asset filenames should use descriptive kebab-case names."
+        },
+        {
+          "prefixes": [
+            "src/styles/",
+            "src/icons/",
+            "src/content/",
+            "src/lib/",
+            "src/components/",
+            "src/layouts/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "kebab-case",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Astro support directories should be responsibility-specific and kebab-case."
+        },
+        {
+          "prefixes": [
+            "src/styles/",
+            "src/lib/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "css",
+            "ts",
+            "js",
+            "mts",
+            "cts"
+          ],
+          "forbiddenNames": [
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Astro support modules and style files should use responsibility-specific kebab-case names."
+        }
+      ]
+    }
+  }
+}

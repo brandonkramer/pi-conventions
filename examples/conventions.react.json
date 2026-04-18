@@ -1,0 +1,167 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Assumes a React 19 app with a thin app or router shell and feature-based folders.",
+    "Prefer components, features, hooks, providers, and lib over catch-all shared roots."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc",
+        "shared"
+      ],
+      "layers": [
+        {
+          "name": "app",
+          "prefixes": [
+            "src/app/"
+          ],
+          "description": "application shell, router wiring, and composition root"
+        },
+        {
+          "name": "routes",
+          "prefixes": [
+            "src/routes/"
+          ],
+          "description": "route-level screens and routing configuration"
+        },
+        {
+          "name": "features",
+          "prefixes": [
+            "src/features/"
+          ],
+          "description": "feature-scoped state, hooks, API calls, and UI"
+        },
+        {
+          "name": "components",
+          "prefixes": [
+            "src/components/"
+          ],
+          "description": "shared presentational components and reusable UI"
+        },
+        {
+          "name": "hooks",
+          "prefixes": [
+            "src/hooks/"
+          ],
+          "description": "shared custom hooks"
+        },
+        {
+          "name": "providers",
+          "prefixes": [
+            "src/providers/"
+          ],
+          "description": "context providers and cross-app wiring"
+        },
+        {
+          "name": "lib",
+          "prefixes": [
+            "src/lib/"
+          ],
+          "description": "shared support modules and non-UI helpers"
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      }
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "src/components/",
+            "src/providers/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "PascalCase",
+          "extensions": [
+            "tsx"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Shared component and provider files should use descriptive PascalCase names."
+        },
+        {
+          "prefixes": [
+            "src/hooks/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "ts",
+            "tsx"
+          ],
+          "forbiddenNames": [
+            "hook",
+            "hooks",
+            "util",
+            "utils",
+            "helper",
+            "helpers"
+          ],
+          "reason": "Hook files should use descriptive kebab-case names such as use-session or use-query-state."
+        },
+        {
+          "prefixes": [
+            "src/app/",
+            "src/routes/",
+            "src/features/",
+            "src/lib/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "kebab-case",
+          "extensions": [
+            "ts",
+            "tsx"
+          ],
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "Feature and support modules should use responsibility-specific kebab-case filenames."
+        },
+        {
+          "prefixes": [
+            "src/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "kebab-case",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc",
+            "shared"
+          ],
+          "reason": "React source directories should be responsibility-specific and kebab-case."
+        }
+      ]
+    }
+  }
+}

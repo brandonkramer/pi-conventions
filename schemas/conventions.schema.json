@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "./conventions.schema.json",
+  "title": "Pi Conventions Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "structure": {
+          "$ref": "#/$defs/structurePolicy"
+        },
+        "naming": {
+          "$ref": "#/$defs/namingPolicy"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "enforcementMode": {
+      "type": "string",
+      "enum": ["warn", "confirm", "block"]
+    },
+    "structureLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "prefixes"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "prefixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "legacyZone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefixes", "reason"],
+      "properties": {
+        "prefixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "onCreate": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "onEdit": {
+          "$ref": "#/$defs/enforcementMode"
+        }
+      }
+    },
+    "newTopLevelFiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "allowedFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "structurePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "editMode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "sourceRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbiddenSegments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/structureLayer"
+          }
+        },
+        "legacyZones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/legacyZone"
+          }
+        },
+        "newTopLevelFiles": {
+          "$ref": "#/$defs/newTopLevelFiles"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "namingPathKind": {
+      "type": "string",
+      "enum": ["file", "directory"]
+    },
+    "namingCaseStyle": {
+      "type": "string",
+      "enum": ["kebab-case", "snake_case", "camelCase", "PascalCase"]
+    },
+    "namingRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefixes"],
+      "properties": {
+        "prefixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "pathKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namingPathKind"
+          }
+        },
+        "requireCase": {
+          "$ref": "#/$defs/namingCaseStyle"
+        },
+        "forbiddenNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "onCreate": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "onEdit": {
+          "$ref": "#/$defs/enforcementMode"
+        }
+      }
+    },
+    "namingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "editMode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/namingRule"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

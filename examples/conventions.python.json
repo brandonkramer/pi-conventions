@@ -1,0 +1,86 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Assumes the preferred Python src layout: package code under src/<package>/ and tests under tests/.",
+    "Use snake_case module and package names, and keep layering light unless the codebase clearly needs more structure."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "block",
+      "editMode": "warn",
+      "sourceRoots": [
+        "src/",
+        "tests/"
+      ],
+      "forbiddenSegments": [
+        "utils",
+        "helpers",
+        "common",
+        "misc"
+      ],
+      "legacyZones": [
+        {
+          "prefixes": [
+            "src/utils/",
+            "src/helpers/",
+            "tests/utils/"
+          ],
+          "onCreate": "block",
+          "onEdit": "warn",
+          "reason": "Replace catch-all modules with package names that describe the responsibility."
+        }
+      ],
+      "newTopLevelFiles": {
+        "enabled": false
+      },
+      "notes": [
+        "Prefer src/<package>/ rather than placing application modules directly at the repo root."
+      ]
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": [
+            "src/",
+            "tests/"
+          ],
+          "pathKinds": [
+            "file"
+          ],
+          "requireCase": "snake_case",
+          "extensions": [
+            "py"
+          ],
+          "forbiddenNames": [
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Python modules should use descriptive snake_case names."
+        },
+        {
+          "prefixes": [
+            "src/",
+            "tests/"
+          ],
+          "pathKinds": [
+            "directory"
+          ],
+          "requireCase": "snake_case",
+          "forbiddenNames": [
+            "utils",
+            "helpers",
+            "common",
+            "misc"
+          ],
+          "reason": "Python package directories should be responsibility-specific and snake_case."
+        }
+      ]
+    }
+  }
+}

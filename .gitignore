@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Package artifacts
+*.tgz
+dist/
+coverage/
+.vitest/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Pi local state
+.pi/
+.semantic-index/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
