@@ -14,6 +14,14 @@
   ],
   "author": "Brandon",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandonkramer/pi-conventions.git"
+  },
+  "homepage": "https://github.com/brandonkramer/pi-conventions#readme",
+  "bugs": {
+    "url": "https://github.com/brandonkramer/pi-conventions/issues"
+  },
   "engines": {
     "node": ">=20"
   },
