@@ -29,6 +29,7 @@ pi -e /absolute/path/to/pi-conventions/src/index.ts
    - `/conventions create ts`
    - `/conventions create go`
    - `/conventions create python`
+   - `/conventions create documentation`
    - `/conventions create fallback`
 3. Use `/conventions` to inspect the active policy
 4. Optionally use `/skill:conventions-guard` to review and tune the generated config after creation
@@ -38,13 +39,15 @@ Convention lookup:
 - project: `.pi/conventions.json`
 - global fallback: `~/.pi/agent/conventions.json`
 
+Lookup is fallback-only today: if a project config exists, it replaces the global fallback rather than merging with it.
+
 `/conventions create` inspects the current repo and generates both `structure` and `naming` policies to match the repo's observed layout and naming style.
 
 Language-specific create commands copy from the examples folder.
 
 The companion skill is optional and exists only for guided review and tuning after creation.
 
-`/conventions create` and `/conventions create rust|typescript|ts|go|python` scaffold:
+`/conventions create` and `/conventions create rust|typescript|ts|go|python|documentation` scaffold:
 
 - `.pi/conventions.json`
 - `.pi/conventions.schema.json`
@@ -55,6 +58,11 @@ The companion skill is optional and exists only for guided review and tuning aft
 - `~/.pi/agent/conventions.schema.json`
 
 All create commands reload pi automatically. `/conventions reload` is only needed after you manually edit the config.
+
+Diagnostics commands:
+
+- `/conventions check <path>` evaluates one existing file or proposed path and reports matching policy findings.
+- `/conventions audit` runs a read-only repo scan of active policies, skipping common generated/dependency outputs such as `.git/`, `node_modules/`, `dist/`, and `coverage/`.
 
 ## Config shape
 
@@ -98,6 +106,17 @@ All create commands reload pi automatically. `/conventions reload` is only neede
           "format": "TAG: description"
         }
       ]
+    },
+    "size": {
+      "mode": "warn",
+      "limits": [
+        {
+          "prefixes": ["src/"],
+          "extensions": ["ts", "tsx", "rs", "go"],
+          "maxLines": 500,
+          "reason": "Split large files by responsibility."
+        }
+      ]
     }
   }
 }
@@ -133,4 +152,19 @@ Supported deterministic rules:
 
 Scope documentation rules narrowly and exclude generated, vendored, or unusually large files when possible. Content checks are deterministic and intentionally simple, so matching very large files can add linear scan cost to write/edit hooks.
 
-See `examples/conventions.documentation.json` for a documentation-focused example. Copy it manually for now if you want a documentation-only starting point.
+See `examples/conventions.documentation.json` for a documentation-focused example, or scaffold it with `/conventions create documentation`.
+
+### Size policy (optional)
+
+Size checks are additive and disabled unless `policies.size` is present. They inspect file content when available and default to `warn`.
+
+Supported deterministic limits:
+
+- `maxLines` — warn/confirm/block when matching files exceed a configured line count
+- `maxBytes` — warn/confirm/block when matching files exceed a configured UTF-8 byte count
+- `extensions` — scope a limit to selected file extensions, including `d.ts`
+- `ignoreBlankLines` and `ignoreCommentLines` — optionally count only substantive lines
+
+Use size policy to catch files that should be split by responsibility before they become hard to review. See `examples/conventions.size.json` for a focused starting point.
+
+Size policy can also live in the global fallback config at `~/.pi/agent/conventions.json` to provide default limits for repos without a project config. If a repo has its own `.pi/conventions.json`, copy the size policy there as well until global/project config layering is supported.

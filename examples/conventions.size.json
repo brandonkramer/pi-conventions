@@ -1,0 +1,22 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Size checks are optional and warn by default; tune limits by language and repo maturity."
+  ],
+  "policies": {
+    "size": {
+      "mode": "warn",
+      "editMode": "warn",
+      "limits": [
+        {
+          "prefixes": ["src/", "test/"],
+          "extensions": ["ts", "tsx", "mts", "cts", "rs", "go"],
+          "maxLines": 500,
+          "ignoreBlankLines": false,
+          "ignoreCommentLines": false,
+          "reason": "Split large files by responsibility before they become hard to review."
+        }
+      ]
+    }
+  }
+}

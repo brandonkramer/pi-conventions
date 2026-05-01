@@ -26,6 +26,9 @@
         },
         "documentation": {
           "$ref": "#/$defs/documentationPolicy"
+        },
+        "size": {
+          "$ref": "#/$defs/sizePolicy"
         }
       }
     }
@@ -33,12 +36,19 @@
   "$defs": {
     "enforcementMode": {
       "type": "string",
-      "enum": ["warn", "confirm", "block"]
+      "enum": [
+        "warn",
+        "confirm",
+        "block"
+      ]
     },
     "structureLayer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "prefixes"],
+      "required": [
+        "name",
+        "prefixes"
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -58,7 +68,10 @@
     "legacyZone": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["prefixes", "reason"],
+      "required": [
+        "prefixes",
+        "reason"
+      ],
       "properties": {
         "prefixes": {
           "type": "array",
@@ -149,16 +162,26 @@
     },
     "namingPathKind": {
       "type": "string",
-      "enum": ["file", "directory"]
+      "enum": [
+        "file",
+        "directory"
+      ]
     },
     "namingCaseStyle": {
       "type": "string",
-      "enum": ["kebab-case", "snake_case", "camelCase", "PascalCase"]
+      "enum": [
+        "kebab-case",
+        "snake_case",
+        "camelCase",
+        "PascalCase"
+      ]
     },
     "namingRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["prefixes"],
+      "required": [
+        "prefixes"
+      ],
       "properties": {
         "prefixes": {
           "type": "array",
@@ -225,14 +248,23 @@
     },
     "documentationDeclaration": {
       "type": "string",
-      "enum": ["interface", "type", "function", "class", "const"]
+      "enum": [
+        "interface",
+        "type",
+        "function",
+        "class",
+        "const"
+      ]
     },
     "documentationRule": {
       "oneOf": [
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "paths"],
+          "required": [
+            "kind",
+            "paths"
+          ],
           "properties": {
             "kind": {
               "const": "requireTsdocOnExports"
@@ -258,7 +290,11 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "paths", "patterns"],
+          "required": [
+            "kind",
+            "paths",
+            "patterns"
+          ],
           "properties": {
             "kind": {
               "const": "forbidFileHeaders"
@@ -282,7 +318,10 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "paths"],
+          "required": [
+            "kind",
+            "paths"
+          ],
           "properties": {
             "kind": {
               "const": "todoFormat"
@@ -308,7 +347,11 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "paths", "commentKeywords"],
+          "required": [
+            "kind",
+            "paths",
+            "commentKeywords"
+          ],
           "properties": {
             "kind": {
               "const": "requireRationaleComments"
@@ -349,6 +392,87 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/documentationRule"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sizeLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefixes"
+      ],
+      "properties": {
+        "prefixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxLines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "ignoreBlankLines": {
+          "type": "boolean"
+        },
+        "ignoreCommentLines": {
+          "type": "boolean"
+        },
+        "onCreate": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "onEdit": {
+          "$ref": "#/$defs/enforcementMode"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "maxLines"
+          ]
+        },
+        {
+          "required": [
+            "maxBytes"
+          ]
+        }
+      ]
+    },
+    "sizePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "editMode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "limits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sizeLimit"
           }
         },
         "notes": {
