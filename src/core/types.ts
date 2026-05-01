@@ -1,11 +1,15 @@
 import type {
+  DocumentationPolicyConfig,
+  RawDocumentationPolicyConfig,
+} from "../policies/documentation.ts";
+import type {
+  NamingPolicyConfig,
+  RawNamingPolicyConfig,
+} from "../policies/naming.ts";
+import type {
   RawStructurePolicyConfig,
   StructurePolicyConfig,
 } from "../policies/structure.ts";
-import type {
-  RawNamingPolicyConfig,
-  NamingPolicyConfig,
-} from "../policies/naming.ts";
 
 export type EnforcementMode = "warn" | "confirm" | "block";
 
@@ -20,6 +24,7 @@ export interface RawConventionsConfig {
   policies?: {
     structure?: RawStructurePolicyConfig;
     naming?: RawNamingPolicyConfig;
+    documentation?: RawDocumentationPolicyConfig;
   };
 }
 
@@ -29,6 +34,7 @@ export interface ConventionsConfig {
   policies: {
     structure?: StructurePolicyConfig;
     naming?: NamingPolicyConfig;
+    documentation?: DocumentationPolicyConfig;
   };
 }
 

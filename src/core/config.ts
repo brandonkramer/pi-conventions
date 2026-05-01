@@ -1,16 +1,28 @@
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { normalizeDocumentationPolicy } from "../policies/documentation.ts";
 import { normalizeNamingPolicy } from "../policies/naming.ts";
 import { normalizeStructurePolicy } from "../policies/structure.ts";
 import { pathExists } from "./path.ts";
 import { uniqueStrings } from "./strings.ts";
-import type { ConventionsConfig, LoadState, RawConventionsConfig } from "./types.ts";
+import type {
+  ConventionsConfig,
+  LoadState,
+  RawConventionsConfig,
+} from "./types.ts";
 
 const PROJECT_CONFIG_RELATIVE_PATH = path.join(".pi", "conventions.json");
-const GLOBAL_CONFIG_PATH = path.join(os.homedir(), ".pi", "agent", "conventions.json");
+const GLOBAL_CONFIG_PATH = path.join(
+  os.homedir(),
+  ".pi",
+  "agent",
+  "conventions.json",
+);
 
-export async function findConfigPath(startCwd: string): Promise<string | undefined> {
+export async function findConfigPath(
+  startCwd: string,
+): Promise<string | undefined> {
   let current = path.resolve(startCwd);
 
   while (true) {
@@ -26,7 +38,9 @@ export async function findConfigPath(startCwd: string): Promise<string | undefin
     current = parent;
   }
 
-  return (await pathExists(GLOBAL_CONFIG_PATH)) ? GLOBAL_CONFIG_PATH : undefined;
+  return (await pathExists(GLOBAL_CONFIG_PATH))
+    ? GLOBAL_CONFIG_PATH
+    : undefined;
 }
 
 export async function loadState(cwd: string): Promise<LoadState> {
@@ -51,10 +65,17 @@ export async function loadState(cwd: string): Promise<LoadState> {
 }
 
 export function hasActivePolicies(config: ConventionsConfig): boolean {
-  return Boolean(config.policies.structure || config.policies.naming);
+  return Boolean(
+    config.policies.structure ||
+      config.policies.naming ||
+      config.policies.documentation,
+  );
 }
 
-function normalizeConventionsConfig(raw: unknown, configPath: string): ConventionsConfig {
+function normalizeConventionsConfig(
+  raw: unknown,
+  configPath: string,
+): ConventionsConfig {
   const envelope = asConventionsConfig(raw);
   return {
     path: configPath,
@@ -62,6 +83,9 @@ function normalizeConventionsConfig(raw: unknown, configPath: string): Conventio
     policies: {
       structure: normalizeStructurePolicy(envelope?.policies?.structure),
       naming: normalizeNamingPolicy(envelope?.policies?.naming),
+      documentation: normalizeDocumentationPolicy(
+        envelope?.policies?.documentation,
+      ),
     },
   };
 }

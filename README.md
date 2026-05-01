@@ -61,9 +61,7 @@ All create commands reload pi automatically. `/conventions reload` is only neede
 ```json
 {
   "$schema": "./conventions.schema.json",
-  "notes": [
-    "Keep code organized by responsibility."
-  ],
+  "notes": ["Keep code organized by responsibility."],
   "policies": {
     "structure": {
       "mode": "block",
@@ -81,6 +79,23 @@ All create commands reload pi automatically. `/conventions reload` is only neede
           "extensions": ["rs"],
           "forbiddenNames": ["util", "utils", "helper", "helpers"],
           "reason": "Use descriptive snake_case module names."
+        }
+      ]
+    },
+    "documentation": {
+      "mode": "warn",
+      "rules": [
+        {
+          "kind": "requireTsdocOnExports",
+          "paths": ["src/types.ts", "src/http/**"],
+          "declarations": ["interface", "type", "function", "class", "const"],
+          "requireRemarks": false
+        },
+        {
+          "kind": "todoFormat",
+          "paths": ["src/**", "test/**"],
+          "allowedTags": ["TODO", "FIXME"],
+          "format": "TAG: description"
         }
       ]
     }
@@ -104,3 +119,18 @@ What it enforces:
 - forbid generic file or directory names like `index`, `helpers`, or `shared` under selected prefixes
 - scope rules to selected extensions and path kinds
 - warn, confirm, or block on create/edit
+
+### Documentation policy (optional)
+
+Documentation checks are additive and disabled unless `policies.documentation` is present. They inspect post-mutation file content for `write` and `edit` calls and default to `warn`.
+
+Supported deterministic rules:
+
+- `requireTsdocOnExports` — require immediately preceding `/** ... */` TSDoc before exported `interface`, `type`, `function`, `class`, or `const` declarations in matching paths; optionally require `@remarks`
+- `forbidFileHeaders` — flag configured blanket header patterns near the top of matching files, such as `copyright`, `licensed under`, or `spdx-license-identifier`
+- `todoFormat` — require `TODO: description` / `FIXME: description` style comments with configured tags
+- `requireRationaleComments` — warn when sensitive matching files do not contain enough comments with configured rationale keywords
+
+Scope documentation rules narrowly and exclude generated, vendored, or unusually large files when possible. Content checks are deterministic and intentionally simple, so matching very large files can add linear scan cost to write/edit hooks.
+
+See `examples/conventions.documentation.json` for a documentation-focused example. Copy it manually for now if you want a documentation-only starting point.

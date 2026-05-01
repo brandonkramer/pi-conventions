@@ -1,0 +1,45 @@
+{
+  "$schema": "./conventions.schema.json",
+  "notes": [
+    "Documentation checks are optional and intentionally warn by default."
+  ],
+  "policies": {
+    "documentation": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "kind": "requireTsdocOnExports",
+          "paths": [
+            "src/types.ts",
+            "src/defaults.ts",
+            "src/tools/{define,result,progress}.ts",
+            "src/http/**",
+            "src/scrape/pipeline.ts",
+            "src/search/providers/**",
+            "src/research/run.ts"
+          ],
+          "declarations": ["interface", "type", "function", "class", "const"],
+          "requireRemarks": false
+        },
+        {
+          "kind": "forbidFileHeaders",
+          "paths": ["src/**", "test/**"],
+          "patterns": ["copyright", "licensed under", "spdx-license-identifier"]
+        },
+        {
+          "kind": "todoFormat",
+          "paths": ["src/**", "test/**"],
+          "allowedTags": ["TODO", "FIXME"],
+          "format": "TAG: description"
+        },
+        {
+          "kind": "requireRationaleComments",
+          "paths": ["src/http/**"],
+          "commentKeywords": ["SSRF", "security", "invariant", "because", "must", "not sufficient"],
+          "minMatches": 1
+        }
+      ]
+    }
+  }
+}

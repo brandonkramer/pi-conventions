@@ -1,15 +1,33 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { isToolCallEventType, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { buildNamingPromptLines, evaluateNamingViolation } from "../policies/naming.ts";
-import { buildStructurePromptLines, evaluateStructureViolation } from "../policies/structure.ts";
+import {
+  type ExtensionAPI,
+  isToolCallEventType,
+} from "@mariozechner/pi-coding-agent";
+import {
+  buildDocumentationPromptLines,
+  evaluateDocumentationViolation,
+} from "../policies/documentation.ts";
+import {
+  buildNamingPromptLines,
+  evaluateNamingViolation,
+} from "../policies/naming.ts";
+import {
+  buildStructurePromptLines,
+  evaluateStructureViolation,
+} from "../policies/structure.ts";
+import { hasActivePolicies, loadState } from "./config.ts";
 import {
   describeScaffoldResult,
   getConventionsCommandArgumentCompletions,
   parseCreateTargetAlias,
   scaffoldConventions,
 } from "./create.ts";
-import { hasActivePolicies, loadState } from "./config.ts";
-import { normalizeRelativePath, normalizeToolPath, pathExists } from "./path.ts";
+import {
+  normalizeRelativePath,
+  normalizeToolPath,
+  pathExists,
+} from "./path.ts";
 import type { ConventionsConfig, LoadState, Violation } from "./types.ts";
 
 const STATUS_KEY = "conventions";
@@ -22,7 +40,10 @@ const MODE_PRIORITY = {
 export default function conventionsGuard(pi: ExtensionAPI) {
   let cachedState: LoadState | undefined;
 
-  const ensureState = async (cwd: string, forceReload = false): Promise<LoadState> => {
+  const ensureState = async (
+    cwd: string,
+    forceReload = false,
+  ): Promise<LoadState> => {
     const cwdKey = path.resolve(cwd);
     const existingState = cachedState;
     if (!forceReload && existingState?.cwdKey === cwdKey) {
@@ -45,7 +66,8 @@ export default function conventionsGuard(pi: ExtensionAPI) {
     getArgumentCompletions: getConventionsCommandArgumentCompletions,
     handler: async (args, ctx) => {
       const trimmed = (args || "status").trim().toLowerCase();
-      const [action = "status", rawTarget] = trimmed.length > 0 ? trimmed.split(/\s+/, 2) : ["status"];
+      const [action = "status", rawTarget] =
+        trimmed.length > 0 ? trimmed.split(/\s+/, 2) : ["status"];
 
       if (action === "create") {
         const explicitTarget = parseCreateTargetAlias(rawTarget);
@@ -61,13 +83,19 @@ export default function conventionsGuard(pi: ExtensionAPI) {
         try {
           const result = await scaffoldConventions(pi, ctx, explicitTarget);
           if (ctx.hasUI) {
-            ctx.ui.notify(`${describeScaffoldResult(result)}. Reloading…`, "success");
+            (ctx.ui.notify as (message: string, level: string) => void)(
+              `${describeScaffoldResult(result)}. Reloading…`,
+              "success",
+            );
           }
           await ctx.reload();
           return;
         } catch (error: any) {
           if (ctx.hasUI) {
-            ctx.ui.notify(error.message, error.message === "Cancelled by user." ? "warning" : "error");
+            ctx.ui.notify(
+              error.message,
+              error.message === "Cancelled by user." ? "warning" : "error",
+            );
             return;
           }
           throw error;
@@ -87,7 +115,10 @@ export default function conventionsGuard(pi: ExtensionAPI) {
       } else if (state.error) {
         ctx.ui.notify(state.error, "error");
       } else {
-        ctx.ui.notify("No .pi/conventions.json found for this project.", "warning");
+        ctx.ui.notify(
+          "No .pi/conventions.json found for this project.",
+          "warning",
+        );
       }
     },
   });
@@ -111,7 +142,9 @@ export default function conventionsGuard(pi: ExtensionAPI) {
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    if (!isToolCallEventType("write", event) && !isToolCallEventType("edit", event)) {
+    const isWrite = isToolCallEventType("write", event);
+    const isEdit = isToolCallEventType("edit", event);
+    if (!isWrite && !isEdit) {
       return undefined;
     }
 
@@ -124,7 +157,17 @@ export default function conventionsGuard(pi: ExtensionAPI) {
     const relativePath = normalizeRelativePath(event.input.path);
     const absolutePath = path.resolve(ctx.cwd, relativePath);
     const exists = await pathExists(absolutePath);
-    const violation = strongestViolation(collectViolations(relativePath, exists, state.config));
+    const postMutationContent = state.config.policies.documentation
+      ? await derivePostMutationContent(event.input, absolutePath, isWrite)
+      : undefined;
+    const violation = strongestViolation(
+      collectViolations(
+        relativePath,
+        exists,
+        state.config,
+        postMutationContent,
+      ),
+    );
 
     if (!violation) {
       return undefined;
@@ -145,7 +188,10 @@ export default function conventionsGuard(pi: ExtensionAPI) {
           reason: `Conventions guard requires confirmation, but no UI is available. ${reason}`,
         };
       }
-      const ok = await ctx.ui.confirm("Conventions Guard", `${reason}\n\nAllow this mutation anyway?`);
+      const ok = await ctx.ui.confirm(
+        "Conventions Guard",
+        `${reason}\n\nAllow this mutation anyway?`,
+      );
       if (ok) {
         return undefined;
       }
@@ -162,18 +208,39 @@ function collectViolations(
   relativePath: string,
   exists: boolean,
   config: ConventionsConfig,
+  postMutationContent?: string,
 ): Violation[] {
   const violations: Violation[] = [];
 
   if (config.policies.structure) {
-    const violation = evaluateStructureViolation(relativePath, exists, config.policies.structure);
+    const violation = evaluateStructureViolation(
+      relativePath,
+      exists,
+      config.policies.structure,
+    );
     if (violation) {
       violations.push(violation);
     }
   }
 
   if (config.policies.naming) {
-    const violation = evaluateNamingViolation(relativePath, exists, config.policies.naming);
+    const violation = evaluateNamingViolation(
+      relativePath,
+      exists,
+      config.policies.naming,
+    );
+    if (violation) {
+      violations.push(violation);
+    }
+  }
+
+  if (config.policies.documentation && postMutationContent !== undefined) {
+    const violation = evaluateDocumentationViolation(
+      relativePath,
+      exists,
+      postMutationContent,
+      config.policies.documentation,
+    );
     if (violation) {
       violations.push(violation);
     }
@@ -182,12 +249,99 @@ function collectViolations(
   return violations;
 }
 
+async function derivePostMutationContent(
+  input: {
+    content?: unknown;
+    oldText?: unknown;
+    newText?: unknown;
+    edits?: unknown;
+  },
+  absolutePath: string,
+  isWrite: boolean,
+): Promise<string | undefined> {
+  if (isWrite) {
+    return typeof input.content === "string" ? input.content : undefined;
+  }
+
+  const edits = normalizeEditInputs(input);
+  if (edits.length === 0) {
+    return undefined;
+  }
+
+  try {
+    const currentContent = await readFile(absolutePath, "utf8");
+    return applyExactEdits(currentContent, edits);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeEditInputs(input: {
+  oldText?: unknown;
+  newText?: unknown;
+  edits?: unknown;
+}): Array<{ oldText: string; newText: string }> {
+  if (typeof input.oldText === "string" && typeof input.newText === "string") {
+    return [{ oldText: input.oldText, newText: input.newText }];
+  }
+  if (!Array.isArray(input.edits)) {
+    return [];
+  }
+  const edits: Array<{ oldText: string; newText: string }> = [];
+  for (const edit of input.edits) {
+    if (
+      typeof edit?.oldText !== "string" ||
+      typeof edit?.newText !== "string"
+    ) {
+      return [];
+    }
+    edits.push({ oldText: edit.oldText, newText: edit.newText });
+  }
+  return edits;
+}
+
+function applyExactEdits(
+  content: string,
+  edits: Array<{ oldText: string; newText: string }>,
+): string | undefined {
+  const ranges: Array<{ start: number; end: number; newText: string }> = [];
+  for (const edit of edits) {
+    const start = content.indexOf(edit.oldText);
+    if (
+      start === -1 ||
+      content.indexOf(edit.oldText, start + edit.oldText.length) !== -1
+    ) {
+      return undefined;
+    }
+    ranges.push({
+      start,
+      end: start + edit.oldText.length,
+      newText: edit.newText,
+    });
+  }
+
+  ranges.sort((left, right) => left.start - right.start);
+  for (let index = 1; index < ranges.length; index += 1) {
+    if (ranges[index].start < ranges[index - 1].end) {
+      return undefined;
+    }
+  }
+
+  let result = content;
+  for (const range of ranges.reverse()) {
+    result = `${result.slice(0, range.start)}${range.newText}${result.slice(range.end)}`;
+  }
+  return result;
+}
+
 function strongestViolation(violations: Violation[]): Violation | undefined {
   return violations.reduce<Violation | undefined>((strongest, current) => {
     if (!strongest) {
       return current;
     }
-    return MODE_PRIORITY[current.mode] > MODE_PRIORITY[strongest.mode] ? current : strongest;
+    return MODE_PRIORITY[current.mode] > MODE_PRIORITY[strongest.mode]
+      ? current
+      : strongest;
   }, undefined);
 }
 
@@ -195,11 +349,27 @@ function buildSystemPrompt(config: ConventionsConfig): string {
   const lines = ["## Project Conventions Guardrails"];
 
   if (config.policies.structure) {
-    lines.push("", "Structure policy:", ...buildStructurePromptLines(config.policies.structure));
+    lines.push(
+      "",
+      "Structure policy:",
+      ...buildStructurePromptLines(config.policies.structure),
+    );
   }
 
   if (config.policies.naming) {
-    lines.push("", "Naming policy:", ...buildNamingPromptLines(config.policies.naming));
+    lines.push(
+      "",
+      "Naming policy:",
+      ...buildNamingPromptLines(config.policies.naming),
+    );
+  }
+
+  if (config.policies.documentation) {
+    lines.push(
+      "",
+      "Documentation policy:",
+      ...buildDocumentationPromptLines(config.policies.documentation),
+    );
   }
 
   if (config.notes.length > 0) {
@@ -220,12 +390,18 @@ function activePolicySummary(config: ConventionsConfig): string {
   if (config.policies.naming) {
     policies.push("naming");
   }
+  if (config.policies.documentation) {
+    policies.push("documentation");
+  }
   return policies.length > 0 ? policies.join(", ") : "no active policies";
 }
 
 function displayConfigPath(configPath: string): string {
   const home = process.env.HOME;
-  if (home && configPath.startsWith(path.join(home, ".pi", "agent") + path.sep)) {
+  if (
+    home &&
+    configPath.startsWith(path.join(home, ".pi", "agent") + path.sep)
+  ) {
     return `~/.pi/agent/${path.basename(configPath)}`;
   }
   return `.pi/${path.basename(configPath)}`;
@@ -253,6 +429,9 @@ function policyDisplayName(policyId: string): string {
   }
   if (policyId === "naming") {
     return "Naming";
+  }
+  if (policyId === "documentation") {
+    return "Documentation";
   }
   return policyId.charAt(0).toUpperCase() + policyId.slice(1);
 }

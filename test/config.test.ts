@@ -1,6 +1,11 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createTempDir, removeTempDir, writeJson, writeText } from "./helpers.ts";
+import {
+  createTempDir,
+  removeTempDir,
+  writeJson,
+  writeText,
+} from "./helpers.ts";
 
 describe("config loading", () => {
   afterEach(() => {
@@ -11,11 +16,15 @@ describe("config loading", () => {
     const repo = await createTempDir("pcg-config-");
     try {
       const nested = path.join(repo, "packages", "app");
-      await writeJson(repo, ".pi/conventions.json", { policies: { structure: { mode: "warn" } } });
+      await writeJson(repo, ".pi/conventions.json", {
+        policies: { structure: { mode: "warn" } },
+      });
       await writeText(repo, "packages/app/index.ts", "export {};\n");
 
       const { findConfigPath } = await import("../src/core/config.ts");
-      expect(await findConfigPath(nested)).toBe(path.join(repo, ".pi", "conventions.json"));
+      expect(await findConfigPath(nested)).toBe(
+        path.join(repo, ".pi", "conventions.json"),
+      );
     } finally {
       await removeTempDir(repo);
     }
@@ -28,15 +37,49 @@ describe("config loading", () => {
 
     try {
       process.env.HOME = home;
-      await writeJson(home, ".pi/agent/conventions.json", { policies: { structure: { mode: "warn" } } });
+      await writeJson(home, ".pi/agent/conventions.json", {
+        policies: { structure: { mode: "warn" } },
+      });
 
       vi.resetModules();
       const { findConfigPath } = await import("../src/core/config.ts");
-      expect(await findConfigPath(repo)).toBe(path.join(home, ".pi", "agent", "conventions.json"));
+      expect(await findConfigPath(repo)).toBe(
+        path.join(home, ".pi", "agent", "conventions.json"),
+      );
     } finally {
       process.env.HOME = originalHome;
       await removeTempDir(repo);
       await removeTempDir(home);
+    }
+  });
+
+  it("loads optional documentation policies without requiring structure or naming", async () => {
+    const repo = await createTempDir("pcg-doc-config-");
+    try {
+      await writeJson(repo, ".pi/conventions.json", {
+        policies: {
+          documentation: {
+            rules: [
+              {
+                kind: "todoFormat",
+                paths: ["src/**"],
+                allowedTags: ["TODO", "FIXME"],
+              },
+            ],
+          },
+        },
+      });
+      const { hasActivePolicies, loadState } = await import(
+        "../src/core/config.ts"
+      );
+      const state = await loadState(repo);
+
+      expect(state.config?.policies.structure?.mode).toBe("warn");
+      expect(state.config?.policies.naming).toBeUndefined();
+      expect(state.config?.policies.documentation?.mode).toBe("warn");
+      expect(hasActivePolicies(state.config!)).toBe(true);
+    } finally {
+      await removeTempDir(repo);
     }
   });
 

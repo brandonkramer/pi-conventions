@@ -23,6 +23,9 @@
         },
         "naming": {
           "$ref": "#/$defs/namingPolicy"
+        },
+        "documentation": {
+          "$ref": "#/$defs/documentationPolicy"
         }
       }
     }
@@ -210,6 +213,142 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/namingRule"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "documentationDeclaration": {
+      "type": "string",
+      "enum": ["interface", "type", "function", "class", "const"]
+    },
+    "documentationRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "paths"],
+          "properties": {
+            "kind": {
+              "const": "requireTsdocOnExports"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "declarations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/documentationDeclaration"
+              }
+            },
+            "requireRemarks": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "paths", "patterns"],
+          "properties": {
+            "kind": {
+              "const": "forbidFileHeaders"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "patterns": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "paths"],
+          "properties": {
+            "kind": {
+              "const": "todoFormat"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "allowedTags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "format": {
+              "const": "TAG: description"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "paths", "commentKeywords"],
+          "properties": {
+            "kind": {
+              "const": "requireRationaleComments"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "commentKeywords": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "minMatches": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    },
+    "documentationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "editMode": {
+          "$ref": "#/$defs/enforcementMode"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/documentationRule"
           }
         },
         "notes": {
