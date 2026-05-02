@@ -79,6 +79,7 @@ export function getConventionsCommandArgumentCompletions(prefix: string) {
 		"status",
 		"reload",
 		"audit",
+		"audit --include-ignored",
 		"check",
 		"create",
 		"create rust",

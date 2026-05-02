@@ -13,13 +13,14 @@ Use one of these commands:
 /conventions create ts
 /conventions create go
 /conventions create python
+/conventions create documentation
 /conventions create fallback
 ```
 
 Use them this way:
 
 - `/conventions create` inspects the current repo and generates repo-specific `structure` and `naming` policies.
-- `/conventions create rust|typescript|ts|go|python` copies a shipped example into the repo.
+- `/conventions create rust|typescript|ts|go|python|documentation` copies a shipped example into the repo.
 - `/conventions create fallback` writes the global fallback config to `~/.pi/agent/conventions.json`.
 - All create commands reload pi automatically.
 
@@ -35,6 +36,8 @@ For the global fallback, review:
 - `~/.pi/agent/conventions.json`
 - `~/.pi/agent/conventions.schema.json`
 
+Project configs replace the global fallback by default. Set top-level `extendsGlobal: true` in a project config when global policies such as `policies.size` should also apply in that repo.
+
 ## 3. Review these sections first
 
 Check these in order:
@@ -45,6 +48,9 @@ Check these in order:
 4. `policies.structure.legacyZones`
 5. `policies.structure.newTopLevelFiles`
 6. `policies.naming.rules`
+7. optional `policies.documentation.rules`
+8. optional `policies.size.limits`
+9. top-level `extendsGlobal` when global defaults should apply
 
 ## 4. Compare against shipped examples when helpful
 
@@ -79,6 +85,7 @@ The command will ask for overwrite confirmation when a UI is available.
 - Use one shared root config only when one policy genuinely governs the whole repo.
 - If one root config becomes too broad, tighten `sourceRoots`, `layers`, and naming prefixes before inventing many special cases.
 - For polyglot repos, keep the root config conservative and put framework- or language-specific details only where they clearly pay for themselves.
+- Use `extendsGlobal: true` when repo-local rules should layer on top of global fallback defaults instead of replacing them.
 
 ## Completion Checklist
 
@@ -88,3 +95,4 @@ The command will ask for overwrite confirmation when a UI is available.
 - [ ] `legacyZones` only cover actual migration boundaries.
 - [ ] `newTopLevelFiles` matches real entrypoint expectations.
 - [ ] Naming rules reflect stable conventions rather than temporary preferences.
+- [ ] `extendsGlobal` is set only when inherited global policies should apply in this repo.

@@ -14,53 +14,39 @@ import type {
 } from "./types.ts";
 
 const PROJECT_CONFIG_RELATIVE_PATH = path.join(".pi", "conventions.json");
-const GLOBAL_CONFIG_PATH = path.join(
-	os.homedir(),
-	".pi",
-	"agent",
-	"conventions.json",
-);
 
 export async function findConfigPath(
 	startCwd: string,
 ): Promise<string | undefined> {
-	let current = path.resolve(startCwd);
+	const projectConfigPath = await findProjectConfigPath(startCwd);
+	if (projectConfigPath) return projectConfigPath;
 
-	while (true) {
-		const candidatePath = path.join(current, PROJECT_CONFIG_RELATIVE_PATH);
-		if (await pathExists(candidatePath)) {
-			return candidatePath;
-		}
-
-		const parent = path.dirname(current);
-		if (parent === current) {
-			break;
-		}
-		current = parent;
-	}
-
-	return (await pathExists(GLOBAL_CONFIG_PATH))
-		? GLOBAL_CONFIG_PATH
-		: undefined;
+	const fallbackPath = globalConfigPath();
+	return (await pathExists(fallbackPath)) ? fallbackPath : undefined;
 }
 
 export async function loadState(cwd: string): Promise<LoadState> {
 	const cwdKey = path.resolve(cwd);
-	const configPath = await findConfigPath(cwdKey);
-	if (!configPath) {
+	const projectConfigPath = await findProjectConfigPath(cwdKey);
+	if (projectConfigPath) {
+		return loadProjectState(cwdKey, projectConfigPath);
+	}
+
+	const fallbackPath = globalConfigPath();
+	if (!(await pathExists(fallbackPath))) {
 		return { cwdKey };
 	}
 
 	try {
-		const raw = JSON.parse(await readFile(configPath, "utf8")) as unknown;
+		const raw = await readConfigJson(fallbackPath);
 		return {
 			cwdKey,
-			config: normalizeConventionsConfig(raw, configPath),
+			config: normalizeConventionsConfig(raw, fallbackPath, [fallbackPath]),
 		};
 	} catch (error: any) {
 		return {
 			cwdKey,
-			error: `failed to load ${configPath}: ${error.message}`,
+			error: `failed to load ${fallbackPath}: ${error.message}`,
 		};
 	}
 }
@@ -74,13 +60,97 @@ export function hasActivePolicies(config: ConventionsConfig): boolean {
 	);
 }
 
+async function findProjectConfigPath(
+	startCwd: string,
+): Promise<string | undefined> {
+	let current = path.resolve(startCwd);
+
+	while (true) {
+		const candidatePath = path.join(current, PROJECT_CONFIG_RELATIVE_PATH);
+		if (await pathExists(candidatePath)) {
+			return candidatePath;
+		}
+
+		const parent = path.dirname(current);
+		if (parent === current) {
+			return undefined;
+		}
+		current = parent;
+	}
+}
+
+async function loadProjectState(
+	cwdKey: string,
+	projectConfigPath: string,
+): Promise<LoadState> {
+	try {
+		const projectRaw = await readConfigJson(projectConfigPath);
+		const projectEnvelope = asConventionsConfig(projectRaw);
+		if (projectEnvelope?.extendsGlobal !== true) {
+			return {
+				cwdKey,
+				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
+					projectConfigPath,
+				]),
+			};
+		}
+
+		const fallbackPath = globalConfigPath();
+		if (!(await pathExists(fallbackPath))) {
+			return {
+				cwdKey,
+				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
+					projectConfigPath,
+				]),
+				warnings: [
+					`extendsGlobal is true, but no global conventions file exists at ${fallbackPath}`,
+				],
+			};
+		}
+
+		try {
+			const globalRaw = await readConfigJson(fallbackPath);
+			const mergedRaw = mergeRawConventionsConfig(globalRaw, projectRaw);
+			return {
+				cwdKey,
+				config: normalizeConventionsConfig(mergedRaw, projectConfigPath, [
+					projectConfigPath,
+					fallbackPath,
+				]),
+			};
+		} catch (error: any) {
+			return {
+				cwdKey,
+				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
+					projectConfigPath,
+				]),
+				warnings: [
+					`failed to load global conventions from ${fallbackPath}: ${error.message}`,
+				],
+			};
+		}
+	} catch (error: any) {
+		return {
+			cwdKey,
+			error: `failed to load ${projectConfigPath}: ${error.message}`,
+		};
+	}
+}
+
+async function readConfigJson(configPath: string): Promise<unknown> {
+	return JSON.parse(await readFile(configPath, "utf8")) as unknown;
+}
+
 function normalizeConventionsConfig(
 	raw: unknown,
 	configPath: string,
+	sourcePaths: string[],
 ): ConventionsConfig {
 	const envelope = asConventionsConfig(raw);
 	return {
 		path: configPath,
+		sourcePaths,
+		extendsGlobal: envelope?.extendsGlobal === true,
 		notes: uniqueStrings(envelope?.notes, (value) => value),
 		policies: {
 			structure: normalizeStructurePolicy(envelope?.policies?.structure),
@@ -93,8 +163,113 @@ function normalizeConventionsConfig(
 	};
 }
 
+function mergeRawConventionsConfig(
+	globalRaw: unknown,
+	projectRaw: unknown,
+): RawConventionsConfig {
+	const globalConfig = asConventionsConfig(globalRaw);
+	const projectConfig = asConventionsConfig(projectRaw);
+	return {
+		extendsGlobal: projectConfig?.extendsGlobal,
+		notes: concatArrays(globalConfig?.notes, projectConfig?.notes),
+		policies: {
+			structure: mergeStructurePolicy(
+				globalConfig?.policies?.structure,
+				projectConfig?.policies?.structure,
+			),
+			naming: mergeRulePolicy(
+				globalConfig?.policies?.naming,
+				projectConfig?.policies?.naming,
+				"rules",
+			),
+			documentation: mergeRulePolicy(
+				globalConfig?.policies?.documentation,
+				projectConfig?.policies?.documentation,
+				"rules",
+			),
+			size: mergeRulePolicy(
+				globalConfig?.policies?.size,
+				projectConfig?.policies?.size,
+				"limits",
+			),
+		},
+	};
+}
+
+function mergeStructurePolicy(
+	globalPolicy: unknown,
+	projectPolicy: unknown,
+): any {
+	const globalRecord = asRecord(globalPolicy);
+	const projectRecord = asRecord(projectPolicy);
+	if (!globalRecord && !projectRecord) return undefined;
+	return {
+		...globalRecord,
+		...projectRecord,
+		forbiddenSegments: concatArrays(
+			globalRecord?.forbiddenSegments,
+			projectRecord?.forbiddenSegments,
+		),
+		layers: concatArrays(globalRecord?.layers, projectRecord?.layers),
+		legacyZones: concatArrays(
+			globalRecord?.legacyZones,
+			projectRecord?.legacyZones,
+		),
+		notes: concatArrays(globalRecord?.notes, projectRecord?.notes),
+	};
+}
+
+function mergeRulePolicy(
+	globalPolicy: unknown,
+	projectPolicy: unknown,
+	listKey: "rules" | "limits",
+): any {
+	const globalRecord = asRecord(globalPolicy);
+	const projectRecord = asRecord(projectPolicy);
+	if (!globalRecord && !projectRecord) return undefined;
+	return {
+		...globalRecord,
+		...projectRecord,
+		[listKey]: concatArrays(
+			stampRuleModes(globalRecord?.[listKey], globalRecord),
+			stampRuleModes(projectRecord?.[listKey], projectRecord),
+		),
+		notes: concatArrays(globalRecord?.notes, projectRecord?.notes),
+	};
+}
+
+function stampRuleModes(
+	value: unknown,
+	policy: Record<string, any> | undefined,
+) {
+	if (!Array.isArray(value)) return [];
+	return value.map((rule) => {
+		const record = asRecord(rule);
+		if (!record) return rule;
+		return {
+			...record,
+			onCreate: record.onCreate ?? policy?.mode,
+			onEdit: record.onEdit ?? policy?.editMode ?? policy?.mode,
+		};
+	});
+}
+
+function concatArrays(globalValue: unknown, projectValue: unknown): unknown[] {
+	const globalItems = Array.isArray(globalValue) ? globalValue : [];
+	const projectItems = Array.isArray(projectValue) ? projectValue : [];
+	return [...globalItems, ...projectItems];
+}
+
 function asConventionsConfig(raw: unknown): RawConventionsConfig | undefined {
-	return typeof raw === "object" && raw !== null && !Array.isArray(raw)
-		? (raw as RawConventionsConfig)
+	return asRecord(raw) as RawConventionsConfig | undefined;
+}
+
+function asRecord(value: unknown): Record<string, any> | undefined {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, any>)
 		: undefined;
+}
+
+function globalConfigPath(): string {
+	return path.join(os.homedir(), ".pi", "agent", "conventions.json");
 }

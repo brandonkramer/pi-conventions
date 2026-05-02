@@ -80,7 +80,10 @@ export default function conventionsGuard(pi: ExtensionAPI) {
 				return;
 			}
 			if (action === "audit") {
-				await notifyCommandResult(ctx, await handleAudit(ctx.cwd, state));
+				await notifyCommandResult(
+					ctx,
+					await handleAudit(rawTarget, ctx.cwd, state),
+				);
 				return;
 			}
 
@@ -89,7 +92,7 @@ export default function conventionsGuard(pi: ExtensionAPI) {
 			}
 			if (state.config) {
 				ctx.ui.notify(
-					`conventions guard active: ${activePolicySummary(state.config)} via ${state.config.path}`,
+					`conventions guard active: ${activePolicySummary(state.config)} via ${displayConfigSources(state.config)}`,
 					notifyLevel(state),
 				);
 			} else if (state.error) {
@@ -108,6 +111,11 @@ export default function conventionsGuard(pi: ExtensionAPI) {
 		updateStatus(ctx, state);
 		if (state.error && ctx.hasUI) {
 			ctx.ui.notify(state.error, "error");
+		}
+		if (state.warnings && ctx.hasUI) {
+			for (const warning of state.warnings) {
+				ctx.ui.notify(warning, "warning");
+			}
 		}
 	});
 
@@ -237,6 +245,7 @@ async function handleCheck(
 }
 
 async function handleAudit(
+	rawTarget: string,
 	cwd: string,
 	state: LoadState,
 ): Promise<{ message: string; level: "info" | "warning" | "error" }> {
@@ -247,7 +256,19 @@ async function handleAudit(
 			level: "warning",
 		};
 	}
-	return { message: await auditConventions(cwd, state.config), level: "info" };
+	const args = rawTarget.split(/\s+/).filter(Boolean);
+	const includeIgnored = args.includes("--include-ignored");
+	const unknownArg = args.find((arg) => arg !== "--include-ignored");
+	if (unknownArg) {
+		return {
+			message: "Usage: /conventions audit [--include-ignored]",
+			level: "warning",
+		};
+	}
+	return {
+		message: await auditConventions(cwd, state.config, { includeIgnored }),
+		level: "info",
+	};
 }
 
 async function notifyCommandResult(
@@ -313,6 +334,14 @@ function activePolicySummary(config: ConventionsConfig): string {
 	return policies.length > 0 ? policies.join(", ") : "no active policies";
 }
 
+function displayConfigSources(config: ConventionsConfig): string {
+	const paths =
+		config.sourcePaths && config.sourcePaths.length > 0
+			? config.sourcePaths
+			: [config.path];
+	return paths.map(displayConfigPath).join(" + ");
+}
+
 function displayConfigPath(configPath: string): string {
 	const home = process.env.HOME;
 	if (
@@ -327,12 +356,15 @@ function displayConfigPath(configPath: string): string {
 function statusText(state: LoadState): string {
 	if (state.error) return "conventions: error";
 	if (!state.config) return "conventions: none";
-	return `conventions: (${displayConfigPath(state.config.path)})`;
+	const warning =
+		state.warnings && state.warnings.length > 0 ? "; warnings" : "";
+	return `conventions: (${displayConfigSources(state.config)}${warning})`;
 }
 
 function notifyLevel(state: LoadState): "info" | "warning" | "error" {
 	if (state.error) return "error";
-	if (!state.config) return "warning";
+	if (!state.config || (state.warnings && state.warnings.length > 0))
+		return "warning";
 	return "info";
 }
 

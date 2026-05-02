@@ -39,7 +39,18 @@ Convention lookup:
 - project: `.pi/conventions.json`
 - global fallback: `~/.pi/agent/conventions.json`
 
-Lookup is fallback-only today: if a project config exists, it replaces the global fallback rather than merging with it.
+By default, lookup is fallback-only: if a project config exists, it replaces the global fallback. Add top-level `"extendsGlobal": true` to a project config when it should inherit global policies and layer project rules on top. Inherited rule and limit entries keep the enforcement mode from their source config even when the project policy has a different top-level default.
+
+For example, put a global `policies.size` guard in `~/.pi/agent/conventions.json`, then add this to a repo config that should inherit it:
+
+```json
+{
+  "extendsGlobal": true,
+  "policies": {
+    "structure": { "sourceRoots": ["src/"] }
+  }
+}
+```
 
 `/conventions create` inspects the current repo and generates both `structure` and `naming` policies to match the repo's observed layout and naming style.
 
@@ -62,13 +73,15 @@ All create commands reload pi automatically. `/conventions reload` is only neede
 Diagnostics commands:
 
 - `/conventions check <path>` evaluates one existing file or proposed path and reports matching policy findings.
-- `/conventions audit` runs a read-only repo scan of active policies, skipping common generated/dependency outputs such as `.git/`, `node_modules/`, `dist/`, and `coverage/`.
+- `/conventions audit` runs a read-only repo scan of active policies. In Git repositories it audits Git-visible files using Git's standard ignore rules (`.gitignore`, `.git/info/exclude`, and global excludes). Outside Git repositories it falls back to a conservative built-in ignore list for common generated/dependency outputs such as `.git/`, `node_modules/`, `dist/`, and `coverage/`.
+- `/conventions audit --include-ignored` bypasses Git file discovery and uses the fallback walker.
 
 ## Config shape
 
 ```json
 {
   "$schema": "./conventions.schema.json",
+  "extendsGlobal": true,
   "notes": ["Keep code organized by responsibility."],
   "policies": {
     "structure": {
@@ -167,4 +180,4 @@ Supported deterministic limits:
 
 Use size policy to catch files that should be split by responsibility before they become hard to review. See `examples/conventions.size.json` for a focused starting point.
 
-Size policy can also live in the global fallback config at `~/.pi/agent/conventions.json` to provide default limits for repos without a project config. If a repo has its own `.pi/conventions.json`, copy the size policy there as well until global/project config layering is supported.
+Size policy can also live in the global fallback config at `~/.pi/agent/conventions.json`. Project configs can inherit those global limits with top-level `"extendsGlobal": true`, which is useful when global size rules should act as a default file-size guard while each repo still owns its local structure/naming/docs rules. See `examples/conventions.extends-global.json` for a project config that layers local rules on top of global defaults.

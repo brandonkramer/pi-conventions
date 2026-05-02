@@ -112,6 +112,187 @@ describe("config loading", () => {
 		}
 	});
 
+	it("does not inherit global fallback when project config omits extendsGlobal", async () => {
+		const home = await createTempDir("pcg-home-no-extend-");
+		const repo = await createTempDir("pcg-repo-no-extend-");
+		const originalHome = process.env.HOME;
+
+		try {
+			process.env.HOME = home;
+			await writeJson(home, ".pi/agent/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					naming: {
+						rules: [{ prefixes: ["src/"], requireCase: "kebab-case" }],
+					},
+				},
+			});
+
+			const { loadState } = await import("../src/core/config.ts");
+			const state = await loadState(repo);
+
+			expect(state.config?.policies.naming).toBeDefined();
+			expect(state.config?.policies.size).toBeUndefined();
+			expect(state.config?.sourcePaths).toEqual([
+				path.join(repo, ".pi", "conventions.json"),
+			]);
+		} finally {
+			process.env.HOME = originalHome;
+			await removeTempDir(repo);
+			await removeTempDir(home);
+		}
+	});
+
+	it("treats extendsGlobal false the same as fallback-only replacement", async () => {
+		const home = await createTempDir("pcg-home-false-extend-");
+		const repo = await createTempDir("pcg-repo-false-extend-");
+		const originalHome = process.env.HOME;
+
+		try {
+			process.env.HOME = home;
+			await writeJson(home, ".pi/agent/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await writeJson(repo, ".pi/conventions.json", {
+				extendsGlobal: false,
+				policies: {
+					documentation: { rules: [{ kind: "todoFormat", paths: ["src/**"] }] },
+				},
+			});
+
+			const { loadState } = await import("../src/core/config.ts");
+			const state = await loadState(repo);
+
+			expect(state.config?.policies.documentation).toBeDefined();
+			expect(state.config?.policies.size).toBeUndefined();
+		} finally {
+			process.env.HOME = originalHome;
+			await removeTempDir(repo);
+			await removeTempDir(home);
+		}
+	});
+
+	it("layers global fallback policies when project config extendsGlobal", async () => {
+		const home = await createTempDir("pcg-home-extend-");
+		const repo = await createTempDir("pcg-repo-extend-");
+		const originalHome = process.env.HOME;
+
+		try {
+			process.env.HOME = home;
+			await writeJson(home, ".pi/agent/conventions.json", {
+				notes: ["global note"],
+				policies: {
+					size: {
+						mode: "block",
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await writeJson(repo, ".pi/conventions.json", {
+				extendsGlobal: true,
+				notes: ["project note"],
+				policies: {
+					structure: { sourceRoots: ["app/"] },
+					naming: {
+						rules: [{ prefixes: ["app/"], requireCase: "kebab-case" }],
+					},
+					size: {
+						mode: "warn",
+						limits: [{ prefixes: ["app/"], extensions: ["ts"], maxLines: 50 }],
+					},
+				},
+			});
+
+			const { hasActivePolicies, loadState } = await import(
+				"../src/core/config.ts"
+			);
+			const state = await loadState(repo);
+
+			expect(state.config?.extendsGlobal).toBe(true);
+			expect(state.config?.notes).toEqual(["global note", "project note"]);
+			expect(state.config?.policies.structure?.sourceRoots).toEqual(["app/"]);
+			expect(state.config?.policies.naming?.rules).toHaveLength(1);
+			expect(state.config?.policies.size?.mode).toBe("warn");
+			expect(state.config?.policies.size?.limits).toHaveLength(2);
+			expect(state.config?.policies.size?.limits[0].maxLines).toBe(1);
+			expect(state.config?.policies.size?.limits[0].onCreate).toBe("block");
+			expect(state.config?.policies.size?.limits[1].maxLines).toBe(50);
+			expect(state.config?.policies.size?.limits[1].onCreate).toBe("warn");
+			expect(state.config?.sourcePaths).toEqual([
+				path.join(repo, ".pi", "conventions.json"),
+				path.join(home, ".pi", "agent", "conventions.json"),
+			]);
+			expect(hasActivePolicies(state.config!)).toBe(true);
+		} finally {
+			process.env.HOME = originalHome;
+			await removeTempDir(repo);
+			await removeTempDir(home);
+		}
+	});
+
+	it("warns and keeps project config active when extendsGlobal has no global config", async () => {
+		const home = await createTempDir("pcg-home-missing-global-");
+		const repo = await createTempDir("pcg-repo-missing-global-");
+		const originalHome = process.env.HOME;
+
+		try {
+			process.env.HOME = home;
+			await writeJson(repo, ".pi/conventions.json", {
+				extendsGlobal: true,
+				policies: { size: { limits: [{ prefixes: ["src/"], maxLines: 1 }] } },
+			});
+
+			const { loadState } = await import("../src/core/config.ts");
+			const state = await loadState(repo);
+
+			expect(state.error).toBeUndefined();
+			expect(state.warnings?.[0]).toContain("extendsGlobal is true");
+			expect(state.config?.policies.size?.limits[0].maxLines).toBe(1);
+		} finally {
+			process.env.HOME = originalHome;
+			await removeTempDir(repo);
+			await removeTempDir(home);
+		}
+	});
+
+	it("keeps valid project config active when extended global config cannot parse", async () => {
+		const home = await createTempDir("pcg-home-invalid-global-");
+		const repo = await createTempDir("pcg-repo-invalid-global-");
+		const originalHome = process.env.HOME;
+
+		try {
+			process.env.HOME = home;
+			await writeText(home, ".pi/agent/conventions.json", "{ invalid json\n");
+			await writeJson(repo, ".pi/conventions.json", {
+				extendsGlobal: true,
+				policies: { size: { limits: [{ prefixes: ["src/"], maxLines: 1 }] } },
+			});
+
+			const { loadState } = await import("../src/core/config.ts");
+			const state = await loadState(repo);
+
+			expect(state.error).toBeUndefined();
+			expect(state.warnings?.[0]).toContain(
+				"failed to load global conventions",
+			);
+			expect(state.config?.policies.size?.limits[0].maxLines).toBe(1);
+		} finally {
+			process.env.HOME = originalHome;
+			await removeTempDir(repo);
+			await removeTempDir(home);
+		}
+	});
+
 	it("returns a readable error when the config file is invalid JSON", async () => {
 		const repo = await createTempDir("pcg-invalid-");
 		try {

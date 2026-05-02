@@ -1,0 +1,28 @@
+{
+  "$schema": "../schemas/conventions.schema.json",
+  "extendsGlobal": true,
+  "notes": [
+    "Inherit global fallback policies such as size limits, then add repo-local structure and naming rules."
+  ],
+  "policies": {
+    "structure": {
+      "mode": "warn",
+      "editMode": "warn",
+      "sourceRoots": ["src/"],
+      "forbiddenSegments": ["utils", "helpers", "common", "misc"]
+    },
+    "naming": {
+      "mode": "warn",
+      "editMode": "warn",
+      "rules": [
+        {
+          "prefixes": ["src/"],
+          "pathKinds": ["file"],
+          "requireCase": "kebab-case",
+          "extensions": ["ts", "tsx", "mts", "cts"],
+          "forbiddenNames": ["util", "utils", "helper", "helpers"]
+        }
+      ]
+    }
+  }
+}

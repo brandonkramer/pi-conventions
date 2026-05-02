@@ -8,6 +8,9 @@
     "$schema": {
       "type": "string"
     },
+    "extendsGlobal": {
+      "type": "boolean"
+    },
     "notes": {
       "type": "array",
       "items": {

@@ -1,5 +1,7 @@
+import { execFile } from "node:child_process";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import {
 	collectViolations,
 	needsContentForPath,
@@ -21,6 +23,11 @@ const IGNORED_DIRS = new Set([
 	".vitest",
 ]);
 const IGNORED_EXTENSIONS = [".tgz"];
+const execFileAsync = promisify(execFile);
+
+export interface AuditConventionsOptions {
+	includeIgnored?: boolean;
+}
 
 export async function checkConventionsPath(
 	cwd: string,
@@ -41,11 +48,15 @@ export async function checkConventionsPath(
 export async function auditConventions(
 	cwd: string,
 	config: ConventionsConfig,
+	options: AuditConventionsOptions = {},
 ): Promise<string> {
-	const files = await listAuditFiles(cwd);
+	const files = await listAuditFiles(cwd, options);
 	const findings: DiagnosticFinding[] = [];
 
 	for (const relativePath of files) {
+		if (!(await fileExists(path.resolve(cwd, relativePath)))) {
+			continue;
+		}
 		const content = await readContentIfNeeded(cwd, relativePath, true, config);
 		for (const violation of collectViolations(
 			{ relativePath, exists: true, content },
@@ -74,10 +85,37 @@ async function readContentIfNeeded(
 	}
 }
 
-async function listAuditFiles(cwd: string): Promise<string[]> {
+async function listAuditFiles(
+	cwd: string,
+	options: AuditConventionsOptions,
+): Promise<string[]> {
+	if (!options.includeIgnored) {
+		const gitFiles = await listGitAuditFiles(cwd);
+		if (gitFiles) {
+			return gitFiles;
+		}
+	}
+
 	const result: string[] = [];
 	await walk(cwd, "", result);
 	return result.sort();
+}
+
+async function listGitAuditFiles(cwd: string): Promise<string[] | undefined> {
+	try {
+		const { stdout } = await execFileAsync(
+			"git",
+			["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+			{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+		);
+		return uniqueSortedPaths(stdout.split("\0").filter(Boolean));
+	} catch {
+		return undefined;
+	}
+}
+
+function uniqueSortedPaths(paths: string[]): string[] {
+	return [...new Set(paths.map(normalizeRelativePath))].sort();
 }
 
 async function walk(

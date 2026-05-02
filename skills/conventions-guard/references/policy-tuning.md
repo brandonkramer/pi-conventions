@@ -14,7 +14,8 @@ Tune the repo-local `.pi/conventions.json` after `/conventions create`, or after
 6. Use `policies.naming` only for stable conventions that are worth enforcing.
 7. Use optional `policies.documentation` only for deterministic comment checks such as TSDoc presence, TODO/FIXME format, forbidden headers, or configured rationale keywords.
 8. Use optional `policies.size` for deterministic line/byte budgets on selected paths; prefer `warn` until limits are proven low-noise.
-9. Keep top-level `notes` short and repo-specific.
+9. Use top-level `extendsGlobal: true` when a repo should inherit global fallback policies such as a default `policies.size` guard.
+10. Keep top-level `notes` short and repo-specific.
 
 ## Common Patterns
 
@@ -26,6 +27,7 @@ Tune the repo-local `.pi/conventions.json` after `/conventions create`, or after
 | Naming conventions still fluid | omit `policies.naming` or keep it narrow and warn-only                                                          |
 | Documentation guidance needed  | add `policies.documentation` with `mode: warn`; keep subjective comment-quality guidance in AGENTS/README prose |
 | Large files growing unchecked  | add `policies.size` with `maxLines` or `maxBytes`; scope by prefix and extension                                |
+| Global defaults should apply   | set project `extendsGlobal: true`; absent/false preserves fallback-only replacement behavior                    |
 
 ## Language and framework guidance
 
@@ -87,6 +89,19 @@ Use `policies.size` to catch files that should be split by responsibility before
 - Use `maxLines` for reviewability and `maxBytes` for generated or data-like files.
 - Use `ignoreBlankLines` or `ignoreCommentLines` only when the team agrees those lines should not count toward the budget.
 - Avoid matching generated/vendor directories; audit/check can help tune noisy limits before blocking.
+
+### Global fallback layering
+
+By default, a project `.pi/conventions.json` replaces the global fallback config at `~/.pi/agent/conventions.json`. Add top-level `extendsGlobal: true` to inherit global policies and layer project rules on top.
+
+Use this when global defaults, especially `policies.size`, should apply across projects while each repo still owns local structure, naming, or documentation rules.
+
+Keep in mind:
+
+- Absent or `false` preserves existing fallback-only behavior.
+- Global notes are shown before project notes.
+- Global naming, documentation, and size rules are evaluated before project rules.
+- Project configs should still scope local rules narrowly to avoid noisy inherited + local checks.
 
 ### Create vs edit behavior
 

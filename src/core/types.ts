@@ -24,6 +24,7 @@ export interface Violation {
 }
 
 export interface RawConventionsConfig {
+	extendsGlobal?: unknown;
 	notes?: unknown[];
 	policies?: {
 		structure?: RawStructurePolicyConfig;
@@ -35,6 +36,8 @@ export interface RawConventionsConfig {
 
 export interface ConventionsConfig {
 	path: string;
+	sourcePaths?: string[];
+	extendsGlobal?: boolean;
 	notes: string[];
 	policies: {
 		structure?: StructurePolicyConfig;
@@ -48,4 +51,5 @@ export interface LoadState {
 	cwdKey: string;
 	config?: ConventionsConfig;
 	error?: string;
+	warnings?: string[];
 }

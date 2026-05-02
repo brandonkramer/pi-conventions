@@ -106,7 +106,7 @@ export function evaluateSizeViolation(
 
 export function buildSizePromptLines(config: SizePolicyConfig): string[] {
 	const lines = [
-		`Default new-file mode: ${config.mode}.`,
+		`Default new-file mode: ${config.mode}. Individual inherited limits may keep stricter modes from their source config.`,
 		`Default existing-file edit mode: ${config.editMode}.`,
 		"Size checks run only when file content is available.",
 		"",
@@ -121,7 +121,9 @@ export function buildSizePromptLines(config: SizePolicyConfig): string[] {
 			checks.push(`max ${limit.maxBytes} bytes`);
 		if (limit.extensions.length > 0)
 			checks.push(`extensions ${limit.extensions.join(", ")}`);
-		lines.push(`- ${limit.prefixes.join(", ")} -> ${checks.join("; ")}`);
+		lines.push(
+			`- ${limit.prefixes.join(", ")} -> ${checks.join("; ")} (create: ${limit.onCreate}, edit: ${limit.onEdit})`,
+		);
 		if (limit.reason) {
 			lines.push(`  reason: ${limit.reason}`);
 		}
