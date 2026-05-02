@@ -1,6 +1,6 @@
 {
   "name": "pi-conventions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pi package for enforcing codebase conventions through structure and naming policies.",
   "type": "module",
   "keywords": [
