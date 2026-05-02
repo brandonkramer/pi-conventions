@@ -41,6 +41,8 @@ Convention lookup:
 
 By default, lookup is fallback-only: if a project config exists, it replaces the global fallback. Add top-level `"extendsGlobal": true` to a project config when it should inherit global policies and layer project rules on top. Inherited rule and limit entries keep the enforcement mode from their source config even when the project policy has a different top-level default.
 
+Status labels use source names instead of file paths: `global`, `project`, or `global + project`.
+
 For example, put a global `policies.size` guard in `~/.pi/agent/conventions.json`, then add this to a repo config that should inherit it:
 
 ```json

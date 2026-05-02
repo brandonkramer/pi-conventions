@@ -29,6 +29,8 @@ import {
 import type { ConventionsConfig, LoadState } from "./types.ts";
 
 const STATUS_KEY = "conventions";
+const ANSI_GREEN = "\x1b[32m";
+const ANSI_RESET = "\x1b[0m";
 
 export default function conventionsGuard(pi: ExtensionAPI) {
 	let cachedState: LoadState | undefined;
@@ -339,18 +341,31 @@ function displayConfigSources(config: ConventionsConfig): string {
 		config.sourcePaths && config.sourcePaths.length > 0
 			? config.sourcePaths
 			: [config.path];
-	return paths.map(displayConfigPath).join(" + ");
+	const labels = paths.map(displayConfigSourceLabel);
+	const orderedLabels = ["global", "project"].filter((label) =>
+		labels.includes(label),
+	);
+	const otherLabels = labels.filter((label) => !orderedLabels.includes(label));
+	return [...orderedLabels, ...otherLabels].map(greenText).join(" + ");
 }
 
-function displayConfigPath(configPath: string): string {
+function displayConfigSourceLabel(configPath: string): string {
 	const home = process.env.HOME;
 	if (
 		home &&
-		configPath.startsWith(path.join(home, ".pi", "agent") + path.sep)
+		path.resolve(configPath) ===
+			path.join(home, ".pi", "agent", "conventions.json")
 	) {
-		return `~/.pi/agent/${path.basename(configPath)}`;
+		return "global";
+	}
+	if (path.basename(configPath) === "conventions.json") {
+		return "project";
 	}
 	return `.pi/${path.basename(configPath)}`;
+}
+
+function greenText(value: string): string {
+	return `${ANSI_GREEN}${value}${ANSI_RESET}`;
 }
 
 function statusText(state: LoadState): string {
