@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Improve conventions source status labels, showing `global`, `project`, or `global + project`.
+
 ## 0.2.1
 
 - Fix GitHub Actions npm Trusted Publishing setup.
