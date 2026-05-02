@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Fix GitHub Actions npm Trusted Publishing setup.
+
 ## 0.2.0
 
 - Add size policy and file-size diagnostics (`feat`).
