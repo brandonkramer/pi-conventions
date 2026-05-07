@@ -218,6 +218,69 @@ describe("documentation policy", () => {
 		).toBeUndefined();
 	});
 
+	it("accepts @packagedocumentation when allowPackageDocumentation is enabled", () => {
+		const config = normalizeDocumentationPolicy({
+			rules: [
+				{
+					kind: "requireFileOverview",
+					paths: ["src/**/*.ts"],
+					requiredTags: ["@fileoverview"],
+					allowPackageDocumentation: true,
+				},
+			],
+		});
+
+		// Missing overview entirely → violation
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"export {};\n",
+				config!,
+			)?.reason,
+		).toContain("@fileoverview");
+
+		// @fileoverview present → passes
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"/**\n * @fileoverview Client module.\n */\nexport {};\n",
+				config!,
+			),
+		).toBeUndefined();
+
+		// @packagedocumentation present with allowPackageDocumentation → passes
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"/**\n * @packagedocumentation\n */\nexport {};\n",
+				config!,
+			),
+		).toBeUndefined();
+
+		// @packagedocumentation NOT accepted when allowPackageDocumentation is false
+		const strictConfig = normalizeDocumentationPolicy({
+			rules: [
+				{
+					kind: "requireFileOverview",
+					paths: ["src/**/*.ts"],
+					requiredTags: ["@fileoverview"],
+					allowPackageDocumentation: false,
+				},
+			],
+		});
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"/**\n * @packagedocumentation\n */\nexport {};\n",
+				strictConfig!,
+			)?.reason,
+		).toContain("@fileoverview");
+	});
+
 	it("enforces concrete TODO referents and forbidden comment patterns", () => {
 		const config = normalizeDocumentationPolicy({
 			rules: [
