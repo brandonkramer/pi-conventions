@@ -96,7 +96,7 @@ export async function inferConventionsConfig(projectRoot: string): Promise<Infer
       .filter((directory) => sourceRoots.some((root) => `${directory}/`.startsWith(root)))
       .map((directory) => path.posix.basename(directory).toLowerCase()),
   );
-  const observedExtensions = unique(languageFiles.map((file) => file.extension));
+  const observedExtensions = [...new Set(languageFiles.map((file) => file.extension))];
   const fileRules = buildFileNamingRules(
     language,
     languageFiles,
@@ -261,12 +261,10 @@ function detectSourceRoots(
     return preferredRoots;
   }
 
-  const fallbackRoots = unique(
-    inventory.files
-      .filter((file) => file.family === language)
-      .map((file) => file.path.split("/")[0])
-      .filter((segment) => segment.length > 0),
-  )
+  const fallbackRoots = [...new Set(inventory.files
+    .filter((file) => file.family === language)
+    .map((file) => file.path.split("/")[0])
+    .filter((segment) => segment.length > 0))]
     .filter((segment) => !segment.includes("."))
     .map((segment) => `${segment}/`);
 
@@ -313,7 +311,7 @@ function buildLayerPrefixes(
     }
   }
 
-  return unique(layers).slice(0, 20);
+  return [...new Set(layers)].slice(0, 20);
 }
 
 function buildLegacyZones(sourceRoots: string[], inventory: RepoInventory) {
@@ -322,7 +320,7 @@ function buildLegacyZones(sourceRoots: string[], inventory: RepoInventory) {
     .filter((directory) => FORBIDDEN_SEGMENTS.includes(path.posix.basename(directory).toLowerCase()))
     .map((directory) => `${directory}/`);
 
-  return unique(prefixes).map((prefix) => ({
+  return [...new Set(prefixes)].map((prefix) => ({
     prefixes: [prefix],
     onCreate: "block" as const,
     onEdit: "warn" as const,
@@ -340,11 +338,9 @@ function buildTopLevelFileRule(
     return { enabled: false };
   }
 
-  const allowedFiles = unique(
-    languageFiles
-      .filter((file) => sourceRoots.some((root) => isDirectChildOfRoot(file.path, root)))
-      .map((file) => file.path),
-  );
+  const allowedFiles = [...new Set(languageFiles
+    .filter((file) => sourceRoots.some((root) => isDirectChildOfRoot(file.path, root)))
+    .map((file) => file.path))];
 
   return {
     enabled: true,
@@ -461,6 +457,3 @@ function isDirectChildOfRoot(relativePath: string, root: string): boolean {
   return rest.length > 0 && !rest.includes("/");
 }
 
-function unique<T>(values: T[]): T[] {
-  return [...new Set(values)];
-}
