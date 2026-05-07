@@ -134,10 +134,13 @@ async function walk(
 			path.join(relativeDir, entry.name),
 		);
 		if (entry.isDirectory()) {
-			if (!shouldIgnoreDirectory(entry.name)) {
+			if (!IGNORED_DIRS.has(entry.name)) {
 				await walk(root, relativePath, result);
 			}
-		} else if (entry.isFile() && !shouldIgnoreFile(relativePath)) {
+		} else if (
+			entry.isFile() &&
+			!IGNORED_EXTENSIONS.some((ext) => relativePath.endsWith(ext))
+		) {
 			result.push(relativePath);
 		}
 	}
@@ -157,16 +160,6 @@ async function fileExists(absolutePath: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
-}
-
-function shouldIgnoreDirectory(name: string): boolean {
-	return IGNORED_DIRS.has(name);
-}
-
-function shouldIgnoreFile(relativePath: string): boolean {
-	return IGNORED_EXTENSIONS.some((extension) =>
-		relativePath.endsWith(extension),
-	);
 }
 
 function formatCheck(
