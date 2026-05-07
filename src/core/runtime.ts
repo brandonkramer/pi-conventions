@@ -346,7 +346,9 @@ function displayConfigSources(config: ConventionsConfig): string {
 		labels.includes(label),
 	);
 	const otherLabels = labels.filter((label) => !orderedLabels.includes(label));
-	return [...orderedLabels, ...otherLabels].map(greenText).join(" + ");
+	return [...orderedLabels, ...otherLabels]
+		.map((v) => `${ANSI_GREEN}${v}${ANSI_RESET}`)
+		.join(" + ");
 }
 
 function displayConfigSourceLabel(configPath: string): string {
@@ -362,10 +364,6 @@ function displayConfigSourceLabel(configPath: string): string {
 		return "project";
 	}
 	return `.pi/${path.basename(configPath)}`;
-}
-
-function greenText(value: string): string {
-	return `${ANSI_GREEN}${value}${ANSI_RESET}`;
 }
 
 function statusText(state: LoadState): string {
