@@ -90,32 +90,21 @@ async function listAuditFiles(
 	options: AuditConventionsOptions,
 ): Promise<string[]> {
 	if (!options.includeIgnored) {
-		const gitFiles = await listGitAuditFiles(cwd);
-		if (gitFiles) {
-			return gitFiles;
+		try {
+			const { stdout } = await execFileAsync(
+				"git",
+				["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+				{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+			);
+			return [...new Set(stdout.split("\0").filter(Boolean).map(normalizeRelativePath))].sort();
+		} catch {
+			// fall through to filesystem walk
 		}
 	}
 
 	const result: string[] = [];
 	await walk(cwd, "", result);
 	return result.sort();
-}
-
-async function listGitAuditFiles(cwd: string): Promise<string[] | undefined> {
-	try {
-		const { stdout } = await execFileAsync(
-			"git",
-			["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-			{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-		);
-		return uniqueSortedPaths(stdout.split("\0").filter(Boolean));
-	} catch {
-		return undefined;
-	}
-}
-
-function uniqueSortedPaths(paths: string[]): string[] {
-	return [...new Set(paths.map(normalizeRelativePath))].sort();
 }
 
 async function walk(
