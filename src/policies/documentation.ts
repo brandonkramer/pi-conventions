@@ -204,7 +204,18 @@ export function evaluateDocumentationViolation(
 	for (const rule of config.rules) {
 		if (!matchesAnyPathPattern(relativePath, rule.pathMatchers)) continue;
 
-		const reason = evaluateRule(relativePath, content, rule);
+		const reason =
+			rule.kind === "requireTsdocOnExports"
+				? evaluateTsdocRule(relativePath, content, rule)
+				: rule.kind === "requireFileOverview"
+					? evaluateFileOverviewRule(relativePath, content, rule)
+					: rule.kind === "forbidFileHeaders"
+						? evaluateHeaderRule(relativePath, content, rule)
+						: rule.kind === "forbidCommentPatterns"
+							? evaluateCommentPatternRule(relativePath, content, rule)
+							: rule.kind === "todoFormat"
+								? evaluateTodoRule(relativePath, content, rule)
+								: evaluateRationaleRule(relativePath, content, rule);
 		if (reason) {
 			return {
 				policyId: "documentation",
@@ -276,7 +287,15 @@ export function buildDocumentationPromptLines(
 function normalizeRule(
 	rule: RawDocumentationRule,
 ): DocumentationRule | undefined {
-	const kind = parseRuleKind(rule?.kind);
+	const kind =
+		rule?.kind === "requireTsdocOnExports" ||
+		rule?.kind === "requireFileOverview" ||
+		rule?.kind === "forbidFileHeaders" ||
+		rule?.kind === "forbidCommentPatterns" ||
+		rule?.kind === "todoFormat" ||
+		rule?.kind === "requireRationaleComments"
+			? rule?.kind
+			: undefined;
 	const paths = uniqueStrings(
 		rule?.paths ?? rule?.pathPattern,
 		normalizeRelativePath,
@@ -285,9 +304,10 @@ function normalizeRule(
 	if (!kind || paths.length === 0) return undefined;
 
 	if (kind === "requireTsdocOnExports") {
-		const declarations = uniqueStrings(
-			rule.declarations,
-			parseDeclarationKind,
+		const declarations = uniqueStrings(rule.declarations, (value) =>
+			DEFAULT_DECLARATIONS.includes(value as DocumentationDeclarationKind)
+				? value
+				: "",
 		).filter((value): value is DocumentationDeclarationKind =>
 			DEFAULT_DECLARATIONS.includes(value as DocumentationDeclarationKind),
 		);
@@ -318,7 +338,12 @@ function normalizeRule(
 			allowPackageDocumentation: rule.allowPackageDocumentation === true,
 			description:
 				typeof rule.description === "string" ? rule.description : undefined,
-			minMatches: parsePositiveInteger(rule.minMatches, 1),
+			minMatches:
+				typeof rule.minMatches === "number" &&
+				Number.isInteger(rule.minMatches) &&
+				rule.minMatches > 0
+					? rule.minMatches
+					: 1,
 		};
 	}
 
@@ -340,7 +365,10 @@ function normalizeRule(
 			paths,
 			pathMatchers,
 			allowedTags: allowedTags.length > 0 ? allowedTags : DEFAULT_TODO_TAGS,
-			format: parseTodoFormat(rule.format),
+			format:
+				rule.format === "TAG: concrete action - referent"
+					? rule.format
+					: "TAG: description",
 		};
 	}
 
@@ -353,31 +381,13 @@ function normalizeRule(
 		paths,
 		pathMatchers,
 		commentKeywords,
-		minMatches: parsePositiveInteger(rule.minMatches, 1),
+		minMatches:
+			typeof rule.minMatches === "number" &&
+			Number.isInteger(rule.minMatches) &&
+			rule.minMatches > 0
+				? rule.minMatches
+				: 1,
 	};
-}
-
-function evaluateRule(
-	relativePath: string,
-	content: string,
-	rule: DocumentationRule,
-): string | undefined {
-	if (rule.kind === "requireTsdocOnExports") {
-		return evaluateTsdocRule(relativePath, content, rule);
-	}
-	if (rule.kind === "requireFileOverview") {
-		return evaluateFileOverviewRule(relativePath, content, rule);
-	}
-	if (rule.kind === "forbidFileHeaders") {
-		return evaluateHeaderRule(relativePath, content, rule);
-	}
-	if (rule.kind === "forbidCommentPatterns") {
-		return evaluateCommentPatternRule(relativePath, content, rule);
-	}
-	if (rule.kind === "todoFormat") {
-		return evaluateTodoRule(relativePath, content, rule);
-	}
-	return evaluateRationaleRule(relativePath, content, rule);
 }
 
 function evaluateTsdocRule(
@@ -586,31 +596,3 @@ function parseExportDeclaration(
 	return { kind: match[1] as DocumentationDeclarationKind, name: match[2] };
 }
 
-function parseRuleKind(value: unknown): DocumentationRuleKind | undefined {
-	return value === "requireTsdocOnExports" ||
-		value === "requireFileOverview" ||
-		value === "forbidFileHeaders" ||
-		value === "forbidCommentPatterns" ||
-		value === "todoFormat" ||
-		value === "requireRationaleComments"
-		? value
-		: undefined;
-}
-
-function parseTodoFormat(value: unknown): TodoFormat {
-	return value === "TAG: concrete action - referent"
-		? value
-		: "TAG: description";
-}
-
-function parseDeclarationKind(value: string): string {
-	return DEFAULT_DECLARATIONS.includes(value as DocumentationDeclarationKind)
-		? value
-		: "";
-}
-
-function parsePositiveInteger(value: unknown, fallback: number): number {
-	return typeof value === "number" && Number.isInteger(value) && value > 0
-		? value
-		: fallback;
-}
