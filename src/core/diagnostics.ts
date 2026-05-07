@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import {
@@ -7,7 +7,7 @@ import {
 	needsContentForPath,
 	strongestViolation,
 } from "./evaluate.ts";
-import { normalizeRelativePath } from "./path.ts";
+import { normalizeRelativePath, pathExists } from "./path.ts";
 import type { ConventionsConfig, Violation } from "./types.ts";
 
 export interface DiagnosticFinding {
@@ -36,7 +36,7 @@ export async function checkConventionsPath(
 ): Promise<string> {
 	const relativePath = normalizeRelativePath(rawPath);
 	const absolutePath = path.resolve(cwd, relativePath);
-	const exists = await fileExists(absolutePath);
+	const exists = await pathExists(absolutePath);
 	const content = await readContentIfNeeded(cwd, relativePath, exists, config);
 	const violations = collectViolations(
 		{ relativePath, exists, content },
@@ -54,7 +54,7 @@ export async function auditConventions(
 	const findings: DiagnosticFinding[] = [];
 
 	for (const relativePath of files) {
-		if (!(await fileExists(path.resolve(cwd, relativePath)))) {
+		if (!(await pathExists(path.resolve(cwd, relativePath)))) {
 			continue;
 		}
 		const content = await readContentIfNeeded(cwd, relativePath, true, config);
@@ -151,14 +151,6 @@ async function readDirectoryEntries(absoluteDir: string) {
 		return await readdir(absoluteDir, { withFileTypes: true });
 	} catch {
 		return undefined;
-	}
-}
-
-async function fileExists(absolutePath: string): Promise<boolean> {
-	try {
-		return (await stat(absolutePath)).isFile();
-	} catch {
-		return false;
 	}
 }
 
