@@ -124,8 +124,10 @@ async function walk(
 	result: string[],
 ): Promise<void> {
 	const absoluteDir = path.join(root, relativeDir);
-	const entries = await readDirectoryEntries(absoluteDir);
-	if (!entries) {
+	let entries;
+	try {
+		entries = await readdir(absoluteDir, { withFileTypes: true });
+	} catch {
 		return;
 	}
 
@@ -143,14 +145,6 @@ async function walk(
 		) {
 			result.push(relativePath);
 		}
-	}
-}
-
-async function readDirectoryEntries(absoluteDir: string) {
-	try {
-		return await readdir(absoluteDir, { withFileTypes: true });
-	} catch {
-		return undefined;
 	}
 }
 
