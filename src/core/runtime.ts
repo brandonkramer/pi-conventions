@@ -384,9 +384,5 @@ function notifyLevel(state: LoadState): "info" | "warning" | "error" {
 }
 
 function policyDisplayName(policyId: string): string {
-	if (policyId === "structure") return "Structure";
-	if (policyId === "naming") return "Naming";
-	if (policyId === "documentation") return "Documentation";
-	if (policyId === "size") return "Size";
 	return policyId.charAt(0).toUpperCase() + policyId.slice(1);
 }
