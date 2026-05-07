@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4
+
+- Simplify: remove 81 lines and 20 functions without changing behavior (`chore`).
+  - Collapse `documentation-comments.ts` into `documentation.ts`.
+  - Inline 12 single-use wrapper functions (`parseRuleKind`, `evaluateRule`, `greenText`, `unique`, `shouldIgnoreDirectory`, `fileExists`, `readDirectoryEntries`, `listGitAuditFiles`, `shouldSkipDirectory`, etc.).
+  - Replace duplicate `fileExists` with existing `pathExists`.
+  - Use standard JS idioms (`[...new Set(...)]`) over custom helpers.
+  - Metrics: 3044 LOC → 2963 (-2.7%), 405 functions → 385 (-4.9%).
+
 ## 0.2.3
 
 - Performance: optimize documentation policy evaluation hot path (`perf`).
