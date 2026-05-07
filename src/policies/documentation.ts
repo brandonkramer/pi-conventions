@@ -6,9 +6,39 @@ import {
 } from "../core/pattern.ts";
 import { parseMode, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
-import {
-	findLeadingBlockComment,
-} from "./documentation-comments.ts";
+export interface LeadingBlockComment {
+	line: number;
+	text: string;
+}
+
+export function findLeadingBlockComment(
+	content: string,
+): LeadingBlockComment | undefined {
+	let pos = 0;
+	if (content.startsWith("#!")) {
+		const nl = content.indexOf("\n", pos);
+		pos = nl === -1 ? content.length : nl + 1;
+	}
+	while (pos < content.length) {
+		const c = content[pos];
+		if (c === " " || c === "\t" || c === "\r" || c === "\n") {
+			pos++;
+		} else {
+			break;
+		}
+	}
+	if (!content.startsWith("/**", pos)) return undefined;
+
+	const start = pos;
+	const end = content.indexOf("*/", pos + 3);
+	if (end === -1) return undefined;
+
+	let line = 1;
+	for (let i = 0; i < start; i++) {
+		if (content[i] === "\n") line++;
+	}
+	return { line, text: content.slice(start, end + 2) };
+}
 
 export type DocumentationRuleKind =
 	| "requireTsdocOnExports"

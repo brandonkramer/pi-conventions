@@ -8,7 +8,27 @@ import {
 import { compilePathPatterns, matchesAnyPathPattern } from "../src/core/pattern.ts";
 import { normalizeRelativePath } from "../src/core/path.ts";
 import { uniqueStrings } from "../src/core/strings.ts";
-import { extractCommentLines, extractComments, findLeadingBlockComment } from "../src/policies/documentation-comments.ts";
+import { findLeadingBlockComment } from "../src/policies/documentation.ts";
+
+function extractCommentLines(content: string): { line: number; text: string }[] {
+	const result: { line: number; text: string }[] = [];
+	const lines = content.split(/\r?\n/);
+	for (let index = 0; index < lines.length; index += 1) {
+		const match = /\/\/\s*(.*)|\/\*+\s*(.*?)\s*\*\//.exec(lines[index]);
+		if (match) {
+			result.push({ line: index + 1, text: match[1] ?? match[2] ?? "" });
+		}
+	}
+	return result;
+}
+
+function extractComments(content: string): string[] {
+	const comments: string[] = [];
+	for (const match of content.matchAll(/\/\/([^\n]*)|\/[\s\S]*?\*\//g)) {
+		comments.push(match[1] ?? match[0]);
+	}
+	return comments;
+}
 
 // Build a realistic config with all documentation rule types
 const config = normalizeDocumentationPolicy({
