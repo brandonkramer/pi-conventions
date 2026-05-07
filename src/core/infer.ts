@@ -177,7 +177,7 @@ async function walk(
 
     const relativePath = relativeDir ? path.posix.join(relativeDir, entry.name) : entry.name;
     if (entry.isDirectory()) {
-      if (shouldSkipDirectory(entry.name)) {
+      if (EXCLUDED_DIR_NAMES.has(entry.name) || entry.name.startsWith(".")) {
         continue;
       }
       inventory.directories.push(relativePath);
@@ -196,10 +196,6 @@ async function walk(
 
     inventory.files.push(detected);
   }
-}
-
-function shouldSkipDirectory(name: string): boolean {
-  return EXCLUDED_DIR_NAMES.has(name) || name.startsWith(".");
 }
 
 async function detectProjectLanguage(
@@ -419,7 +415,7 @@ function detectLanguageFile(relativePath: string): RepoFile | undefined {
     };
   }
 
-  const match = /\.([^.\/]+)$/.exec(relativePath);
+  const match = /\.([^./]+)$/.exec(relativePath);
   if (!match) {
     return undefined;
   }
