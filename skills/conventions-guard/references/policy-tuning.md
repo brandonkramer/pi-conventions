@@ -72,11 +72,13 @@ Do **not** add legitimate framework or toolchain directories to forbidden segmen
 Documentation rules inspect post-mutation file content on write/edit. Keep them narrow and warn-first:
 
 - `requireTsdocOnExports` for exported contracts in selected files or globs.
+- `requireFileOverview` for leading module TSDoc with `@fileoverview` and configured section markers such as `Design:`.
 - `forbidFileHeaders` for blanket license/copyright/SPDX headers where the repo does not want them.
-- `todoFormat` for `TODO: description` and `FIXME: description` comments.
+- `forbidCommentPatterns` for repo-specific banned comment references, such as tickets or PR numbers.
+- `todoFormat` for `TODO: description` / `FIXME: description`, or stricter `TODO: concrete action - referent`, comments.
 - `requireRationaleComments` for sensitive paths that should include configured security/invariant keywords.
 
-Do not use documentation policy to judge whether comments are “good”, whether code is obvious, or whether tests self-document.
+Do not use documentation policy to judge whether comments are “good”, whether code is obvious, or whether tests self-document. Convert subjective guidance into deterministic proxies, and leave the rest as compact notes.
 
 Exclude generated, vendored, or unusually large files where possible. Documentation checks are linear content scans when a rule matches a path.
 

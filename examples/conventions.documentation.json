@@ -23,15 +23,28 @@
           "requireRemarks": false
         },
         {
+          "kind": "requireFileOverview",
+          "paths": ["src/**/*.ts"],
+          "requiredTags": ["@fileoverview"],
+          "requiredSections": ["Design:"],
+          "optionalSections": ["Performance:"],
+          "minMatches": 1
+        },
+        {
           "kind": "forbidFileHeaders",
           "paths": ["src/**", "test/**"],
           "patterns": ["copyright", "licensed under", "spdx-license-identifier"]
         },
         {
+          "kind": "forbidCommentPatterns",
+          "paths": ["src/**", "test/**"],
+          "patterns": ["PR #", "ticket"]
+        },
+        {
           "kind": "todoFormat",
           "paths": ["src/**", "test/**"],
           "allowedTags": ["TODO", "FIXME"],
-          "format": "TAG: description"
+          "format": "TAG: concrete action - referent"
         },
         {
           "kind": "requireRationaleComments",

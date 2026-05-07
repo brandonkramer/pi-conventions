@@ -262,121 +262,56 @@
     "documentationRule": {
       "oneOf": [
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "paths"
-          ],
+          "type": "object", "additionalProperties": false, "required": ["kind"], "anyOf": [{ "required": ["paths"] }, { "required": ["pathPattern"] }],
           "properties": {
-            "kind": {
-              "const": "requireTsdocOnExports"
-            },
-            "paths": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            },
-            "declarations": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/documentationDeclaration"
-              }
-            },
-            "requireRemarks": {
-              "type": "boolean"
-            }
+            "kind": { "const": "requireTsdocOnExports" },
+            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "pathPattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "declarations": { "type": "array", "items": { "$ref": "#/$defs/documentationDeclaration" } },
+            "requireRemarks": { "type": "boolean" }
           }
         },
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "paths",
-            "patterns"
-          ],
+          "type": "object", "additionalProperties": false, "required": ["kind"], "anyOf": [{ "required": ["paths"] }, { "required": ["pathPattern"] }],
           "properties": {
-            "kind": {
-              "const": "forbidFileHeaders"
-            },
-            "paths": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            },
-            "patterns": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            }
+            "kind": { "const": "requireFileOverview" },
+            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "pathPattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "requiredTags": { "type": "array", "items": { "type": "string" } },
+            "requiredSections": { "type": "array", "items": { "type": "string" } },
+            "optionalSections": { "type": "array", "items": { "type": "string" } },
+            "allowPackageDocumentation": { "type": "boolean" },
+            "description": { "type": "string" },
+            "minMatches": { "type": "integer", "minimum": 1 }
           }
         },
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "paths"
-          ],
+          "type": "object", "additionalProperties": false, "required": ["kind", "patterns"], "anyOf": [{ "required": ["paths"] }, { "required": ["pathPattern"] }],
           "properties": {
-            "kind": {
-              "const": "todoFormat"
-            },
-            "paths": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            },
-            "allowedTags": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "format": {
-              "const": "TAG: description"
-            }
+            "kind": { "enum": ["forbidFileHeaders", "forbidCommentPatterns"] },
+            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "pathPattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "patterns": { "type": "array", "minItems": 1, "items": { "type": "string" } }
           }
         },
         {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "paths",
-            "commentKeywords"
-          ],
+          "type": "object", "additionalProperties": false, "required": ["kind"], "anyOf": [{ "required": ["paths"] }, { "required": ["pathPattern"] }],
           "properties": {
-            "kind": {
-              "const": "requireRationaleComments"
-            },
-            "paths": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            },
-            "commentKeywords": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              }
-            },
-            "minMatches": {
-              "type": "integer",
-              "minimum": 1
-            }
+            "kind": { "const": "todoFormat" },
+            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "pathPattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "allowedTags": { "type": "array", "items": { "type": "string" } },
+            "format": { "enum": ["TAG: description", "TAG: concrete action - referent"] }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "commentKeywords"], "anyOf": [{ "required": ["paths"] }, { "required": ["pathPattern"] }],
+          "properties": {
+            "kind": { "const": "requireRationaleComments" },
+            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "pathPattern": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "commentKeywords": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "minMatches": { "type": "integer", "minimum": 1 }
           }
         }
       ]

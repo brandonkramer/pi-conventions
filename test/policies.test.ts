@@ -179,6 +179,86 @@ describe("documentation policy", () => {
 			),
 		).toBeUndefined();
 	});
+
+	it("requires file overviews and supports pathPattern aliases", () => {
+		const config = normalizeDocumentationPolicy({
+			rules: [
+				{
+					kind: "requireFileOverview",
+					pathPattern: ["src/**/*.ts"],
+					requiredSections: ["Design:"],
+					minMatches: 1,
+				},
+			],
+		});
+
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"export {};\n",
+				config!,
+			)?.reason,
+		).toContain("@fileoverview");
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"/**\n * @fileoverview Client.\n */\nexport {};\n",
+				config!,
+			)?.reason,
+		).toContain("Design:");
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"/**\n * @fileoverview Client.\n * Design: Keeps transport policy local.\n */\nexport {};\n",
+				config!,
+			),
+		).toBeUndefined();
+	});
+
+	it("enforces concrete TODO referents and forbidden comment patterns", () => {
+		const config = normalizeDocumentationPolicy({
+			rules: [
+				{
+					kind: "todoFormat",
+					paths: ["src/**"],
+					format: "TAG: concrete action - referent",
+				},
+				{
+					kind: "forbidCommentPatterns",
+					paths: ["src/**"],
+					patterns: ["PR #", "ticket"],
+				},
+			],
+		});
+
+		expect(
+			evaluateDocumentationViolation(
+				"src/client.ts",
+				false,
+				"// TODO: fix this\n",
+				config!,
+			)?.reason,
+		).toContain("concrete action");
+		expect(
+			evaluateDocumentationViolation(
+				"src/client.ts",
+				false,
+				"// TODO: add retry backoff - see http/retry.ts\n",
+				config!,
+			),
+		).toBeUndefined();
+		expect(
+			evaluateDocumentationViolation(
+				"src/client.ts",
+				false,
+				"// See PR #42 for why.\n",
+				config!,
+			)?.reason,
+		).toContain("pr #");
+	});
 });
 
 describe("size policy", () => {

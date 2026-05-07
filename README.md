@@ -115,10 +115,17 @@ Diagnostics commands:
           "requireRemarks": false
         },
         {
+          "kind": "requireFileOverview",
+          "paths": ["src/**/*.ts"],
+          "requiredTags": ["@fileoverview"],
+          "requiredSections": ["Design:"],
+          "optionalSections": ["Performance:"]
+        },
+        {
           "kind": "todoFormat",
           "paths": ["src/**", "test/**"],
           "allowedTags": ["TODO", "FIXME"],
-          "format": "TAG: description"
+          "format": "TAG: concrete action - referent"
         }
       ]
     },
@@ -161,8 +168,10 @@ Documentation checks are additive and disabled unless `policies.documentation` i
 Supported deterministic rules:
 
 - `requireTsdocOnExports` — require immediately preceding `/** ... */` TSDoc before exported `interface`, `type`, `function`, `class`, or `const` declarations in matching paths; optionally require `@remarks`
+- `requireFileOverview` — require a leading TSDoc block with tags such as `@fileoverview` and optional section markers like `Design:` or `Performance:`
 - `forbidFileHeaders` — flag configured blanket header patterns near the top of matching files, such as `copyright`, `licensed under`, or `spdx-license-identifier`
-- `todoFormat` — require `TODO: description` / `FIXME: description` style comments with configured tags
+- `forbidCommentPatterns` — flag configured comment patterns, such as ticket or PR references, anywhere in matching files
+- `todoFormat` — require `TODO: description` / `FIXME: description`, or stricter `TODO: concrete action - referent`, comments with configured tags
 - `requireRationaleComments` — warn when sensitive matching files do not contain enough comments with configured rationale keywords
 
 Scope documentation rules narrowly and exclude generated, vendored, or unusually large files when possible. Content checks are deterministic and intentionally simple, so matching very large files can add linear scan cost to write/edit hooks.

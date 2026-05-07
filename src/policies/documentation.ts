@@ -6,10 +6,15 @@ import {
 } from "../core/pattern.ts";
 import { parseMode, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
+import {
+	findLeadingBlockComment,
+} from "./documentation-comments.ts";
 
 export type DocumentationRuleKind =
 	| "requireTsdocOnExports"
+	| "requireFileOverview"
 	| "forbidFileHeaders"
+	| "forbidCommentPatterns"
 	| "todoFormat"
 	| "requireRationaleComments";
 export type DocumentationDeclarationKind =
@@ -19,15 +24,29 @@ export type DocumentationDeclarationKind =
 	| "class"
 	| "const";
 
+const DECLARATION_BITS: Record<DocumentationDeclarationKind, number> = {
+	interface: 1,
+	type: 2,
+	function: 4,
+	class: 8,
+	const: 16,
+};
+
 export interface RawDocumentationRule {
 	kind?: unknown;
 	paths?: unknown[];
+	pathPattern?: unknown[];
 	declarations?: unknown[];
 	requireRemarks?: unknown;
 	patterns?: unknown[];
 	allowedTags?: unknown[];
 	format?: unknown;
 	commentKeywords?: unknown[];
+	requiredTags?: unknown[];
+	requiredSections?: unknown[];
+	optionalSections?: unknown[];
+	allowPackageDocumentation?: unknown;
+	description?: unknown;
 	minMatches?: unknown;
 }
 
@@ -47,7 +66,18 @@ interface BaseDocumentationRule {
 export interface RequireTsdocOnExportsRule extends BaseDocumentationRule {
 	kind: "requireTsdocOnExports";
 	declarations: DocumentationDeclarationKind[];
+	declarationMask: number;
 	requireRemarks: boolean;
+}
+
+export interface RequireFileOverviewRule extends BaseDocumentationRule {
+	kind: "requireFileOverview";
+	requiredTags: string[];
+	requiredSections: string[];
+	optionalSections: string[];
+	allowPackageDocumentation: boolean;
+	minMatches: number;
+	description?: string;
 }
 
 export interface ForbidFileHeadersRule extends BaseDocumentationRule {
@@ -55,10 +85,17 @@ export interface ForbidFileHeadersRule extends BaseDocumentationRule {
 	patterns: string[];
 }
 
+export interface ForbidCommentPatternsRule extends BaseDocumentationRule {
+	kind: "forbidCommentPatterns";
+	patterns: string[];
+}
+
+export type TodoFormat = "TAG: description" | "TAG: concrete action - referent";
+
 export interface TodoFormatRule extends BaseDocumentationRule {
 	kind: "todoFormat";
 	allowedTags: string[];
-	format: "TAG: description";
+	format: TodoFormat;
 }
 
 export interface RequireRationaleCommentsRule extends BaseDocumentationRule {
@@ -69,7 +106,9 @@ export interface RequireRationaleCommentsRule extends BaseDocumentationRule {
 
 export type DocumentationRule =
 	| RequireTsdocOnExportsRule
+	| RequireFileOverviewRule
 	| ForbidFileHeadersRule
+	| ForbidCommentPatternsRule
 	| TodoFormatRule
 	| RequireRationaleCommentsRule;
 
@@ -163,13 +202,29 @@ export function buildDocumentationPromptLines(
 			lines.push(
 				`- ${rule.paths.join(", ")} -> require TSDoc on exported ${rule.declarations.join(", ")}${remarks}.`,
 			);
+		} else if (rule.kind === "requireFileOverview") {
+			const sections =
+				rule.requiredSections.length > 0
+					? ` with ${rule.requiredSections.join(", ")}`
+					: "";
+			const optional =
+				rule.optionalSections.length > 0
+					? ` Optional: ${rule.optionalSections.join(", ")}.`
+					: "";
+			lines.push(
+				`- ${rule.paths.join(", ")} -> require leading @fileoverview${sections}.${optional}`,
+			);
 		} else if (rule.kind === "forbidFileHeaders") {
 			lines.push(
 				`- ${rule.paths.join(", ")} -> forbid blanket file headers matching ${rule.patterns.join(", ")}.`,
 			);
+		} else if (rule.kind === "forbidCommentPatterns") {
+			lines.push(
+				`- ${rule.paths.join(", ")} -> forbid comments matching ${rule.patterns.join(", ")}.`,
+			);
 		} else if (rule.kind === "todoFormat") {
 			lines.push(
-				`- ${rule.paths.join(", ")} -> require ${rule.allowedTags.join("/")}: description comments.`,
+				`- ${rule.paths.join(", ")} -> require TODO/FIXME comments in ${rule.format} format.`,
 			);
 		} else {
 			lines.push(
@@ -192,7 +247,10 @@ function normalizeRule(
 	rule: RawDocumentationRule,
 ): DocumentationRule | undefined {
 	const kind = parseRuleKind(rule?.kind);
-	const paths = uniqueStrings(rule?.paths, normalizeRelativePath);
+	const paths = uniqueStrings(
+		rule?.paths ?? rule?.pathPattern,
+		normalizeRelativePath,
+	);
 	const pathMatchers = compilePathPatterns(paths);
 	if (!kind || paths.length === 0) return undefined;
 
@@ -209,11 +267,32 @@ function normalizeRule(
 			pathMatchers,
 			declarations:
 				declarations.length > 0 ? declarations : DEFAULT_DECLARATIONS,
+			declarationMask: (declarations.length > 0 ? declarations : DEFAULT_DECLARATIONS)
+				.reduce((mask, kind) => mask | DECLARATION_BITS[kind], 0),
 			requireRemarks: rule.requireRemarks === true,
 		};
 	}
 
-	if (kind === "forbidFileHeaders") {
+	if (kind === "requireFileOverview") {
+		const requiredTags = uniqueStrings(
+			rule.requiredTags,
+			(value) => value,
+		).filter((value) => value.startsWith("@"));
+		return {
+			kind,
+			paths,
+			pathMatchers,
+			requiredTags: requiredTags.length > 0 ? requiredTags : ["@fileoverview"],
+			requiredSections: uniqueStrings(rule.requiredSections, (value) => value),
+			optionalSections: uniqueStrings(rule.optionalSections, (value) => value),
+			allowPackageDocumentation: rule.allowPackageDocumentation === true,
+			description:
+				typeof rule.description === "string" ? rule.description : undefined,
+			minMatches: parsePositiveInteger(rule.minMatches, 1),
+		};
+	}
+
+	if (kind === "forbidFileHeaders" || kind === "forbidCommentPatterns") {
 		const patterns = uniqueStrings(rule.patterns, (value) =>
 			value.toLowerCase(),
 		);
@@ -231,7 +310,7 @@ function normalizeRule(
 			paths,
 			pathMatchers,
 			allowedTags: allowedTags.length > 0 ? allowedTags : DEFAULT_TODO_TAGS,
-			format: "TAG: description",
+			format: parseTodoFormat(rule.format),
 		};
 	}
 
@@ -256,8 +335,14 @@ function evaluateRule(
 	if (rule.kind === "requireTsdocOnExports") {
 		return evaluateTsdocRule(relativePath, content, rule);
 	}
+	if (rule.kind === "requireFileOverview") {
+		return evaluateFileOverviewRule(relativePath, content, rule);
+	}
 	if (rule.kind === "forbidFileHeaders") {
 		return evaluateHeaderRule(relativePath, content, rule);
+	}
+	if (rule.kind === "forbidCommentPatterns") {
+		return evaluateCommentPatternRule(relativePath, content, rule);
 	}
 	if (rule.kind === "todoFormat") {
 		return evaluateTodoRule(relativePath, content, rule);
@@ -270,12 +355,67 @@ function evaluateTsdocRule(
 	content: string,
 	rule: RequireTsdocOnExportsRule,
 ): string | undefined {
-	const lines = content.split(/\r?\n/);
-	for (let index = 0; index < lines.length; index += 1) {
-		const declaration = parseExportDeclaration(lines[index]);
-		if (!declaration || !rule.declarations.includes(declaration.kind)) continue;
+	const lines = content.split("\n");
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (line.length > 0 && line.charCodeAt(line.length - 1) === 13) {
+			lines[i] = line.slice(0, -1);
+		}
+	}
 
-		const tsdoc = findPrecedingTsdoc(lines, index);
+	// First pass: index all TSDoc block ranges.
+	const blocks: { start: number; end: number }[] = [];
+	let inBlock = false;
+	let blockStart = -1;
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (!inBlock) {
+			let pos = 0;
+			while (pos < line.length && (line[pos] === " " || line[pos] === "\t")) pos++;
+			if (line.startsWith("/**", pos)) {
+				inBlock = true;
+				blockStart = i;
+			}
+		}
+		if (inBlock && line.includes("*/")) {
+			inBlock = false;
+			blocks.push({ start: blockStart, end: i });
+		}
+	}
+
+	// Second pass: match exports to immediately-preceding blocks.
+	let blockIdx = 0;
+	for (let index = 0; index < lines.length; index += 1) {
+		while (blockIdx < blocks.length && blocks[blockIdx].end < index) {
+			blockIdx++;
+		}
+		const activeBlock = blockIdx > 0 ? blocks[blockIdx - 1] : undefined;
+
+		const declaration = parseExportDeclaration(lines[index]);
+		if (!declaration || !(DECLARATION_BITS[declaration.kind] & rule.declarationMask)) continue;
+
+		let tsdoc: string | undefined;
+		if (activeBlock) {
+			let allEmpty = true;
+			for (let j = activeBlock.end + 1; j < index; j++) {
+				const gap = lines[j];
+				let nonEmpty = false;
+				for (let k = 0; k < gap.length; k++) {
+					if (gap[k] !== " " && gap[k] !== "\t") {
+						nonEmpty = true;
+						break;
+					}
+				}
+				if (nonEmpty) {
+					allEmpty = false;
+					break;
+				}
+			}
+			if (allEmpty) {
+				tsdoc = lines.slice(activeBlock.start, activeBlock.end + 1).join("\n");
+			}
+		}
+
 		if (!tsdoc) {
 			return `Exported ${declaration.kind} '${declaration.name}' in ${relativePath} needs TSDoc.`;
 		}
@@ -286,13 +426,42 @@ function evaluateTsdocRule(
 	return undefined;
 }
 
+function evaluateFileOverviewRule(
+	relativePath: string,
+	content: string,
+	rule: RequireFileOverviewRule,
+): string | undefined {
+	const overview = findLeadingBlockComment(content);
+	if (!overview) {
+		return `Add a leading TSDoc @fileoverview comment to ${relativePath}.`;
+	}
+
+	const normalized = overview.text.toLowerCase();
+	const tags = rule.allowPackageDocumentation
+		? [...rule.requiredTags, "@packagedocumentation"]
+		: rule.requiredTags;
+	const matches = tags.filter((tag) =>
+		normalized.includes(tag.toLowerCase()),
+	).length;
+	if (matches < rule.minMatches) {
+		return `Add ${rule.requiredTags.join(" or ")} to the leading TSDoc comment in ${relativePath}.`;
+	}
+
+	const missingSection = rule.requiredSections.find(
+		(section) => !overview.text.includes(section),
+	);
+	return missingSection
+		? `Add '${missingSection}' to the @fileoverview comment in ${relativePath}.`
+		: undefined;
+}
+
 function evaluateHeaderRule(
 	relativePath: string,
 	content: string,
 	rule: ForbidFileHeadersRule,
 ): string | undefined {
 	const header = content
-		.split(/\r?\n/)
+		.split(/\r?\n/, HEADER_LINE_LIMIT + 1)
 		.slice(0, HEADER_LINE_LIMIT)
 		.join("\n")
 		.toLowerCase();
@@ -302,24 +471,54 @@ function evaluateHeaderRule(
 		: undefined;
 }
 
+function evaluateCommentPatternRule(
+	relativePath: string,
+	content: string,
+	rule: ForbidCommentPatternsRule,
+): string | undefined {
+	const re = /\/\/([^\n]*)|\/\*[\s\S]*?\*\//g;
+	re.lastIndex = 0;
+	let m;
+	while ((m = re.exec(content)) !== null) {
+		const comment = (m[1] ?? m[0]).toLowerCase();
+		for (const pattern of rule.patterns) {
+			if (comment.includes(pattern)) {
+				return `Avoid comments matching '${pattern}' in ${relativePath}.`;
+			}
+		}
+	}
+	return undefined;
+}
+
 function evaluateTodoRule(
 	relativePath: string,
 	content: string,
 	rule: TodoFormatRule,
 ): string | undefined {
-	const comments = extractCommentLines(content);
-	for (const comment of comments) {
-		const match = /\b(TODO|FIXME)\b\s*(:?)(.*)/i.exec(comment.text);
-		if (!match) continue;
-
+	const re = /^[ \t]*\/\/[ \t]*(TODO|FIXME)[ \t]*(:?)[ \t]*(.*)$/gim;
+	re.lastIndex = 0;
+	let line = 1;
+	let lastIndex = 0;
+	let match;
+	while ((match = re.exec(content)) !== null) {
+		for (let i = lastIndex; i < match.index; i++) {
+			if (content[i] === "\n") line++;
+		}
+		lastIndex = match.index;
 		const tag = match[1].toUpperCase();
 		const hasColon = match[2] === ":";
 		const description = match[3].trim();
 		if (!rule.allowedTags.includes(tag)) {
-			return `Comment tag '${tag}' in ${relativePath}:${comment.line} is not allowed; use ${rule.allowedTags.join(" or ")}.`;
+			return `Comment tag '${tag}' in ${relativePath}:${line} is not allowed; use ${rule.allowedTags.join(" or ")}.`;
 		}
 		if (!hasColon || description.length === 0) {
-			return `Use '${tag}: description' format for TODO/FIXME comments in ${relativePath}:${comment.line}.`;
+			return `Use '${tag}: description' format for TODO/FIXME comments in ${relativePath}:${line}.`;
+		}
+		if (
+			rule.format === "TAG: concrete action - referent" &&
+			!/\S.{2,}\s+-\s+\S/.test(description)
+		) {
+			return `Use '${tag}: concrete action - referent' format for TODO/FIXME comments in ${relativePath}:${line}.`;
 		}
 	}
 	return undefined;
@@ -330,12 +529,17 @@ function evaluateRationaleRule(
 	content: string,
 	rule: RequireRationaleCommentsRule,
 ): string | undefined {
-	const comments = extractComments(content);
-	const matches = comments.filter((comment) => {
-		const normalized = comment.toLowerCase();
-		return rule.commentKeywords.some((keyword) => normalized.includes(keyword));
-	}).length;
-
+	const re = /\/\/([^\n]*)|\/\*[\s\S]*?\*\//g;
+	re.lastIndex = 0;
+	let m;
+	let matches = 0;
+	while ((m = re.exec(content)) !== null) {
+		const comment = (m[1] ?? m[0]).toLowerCase();
+		if (rule.commentKeywords.some((keyword) => comment.includes(keyword))) {
+			matches++;
+			if (matches >= rule.minMatches) return undefined;
+		}
+	}
 	return matches < rule.minMatches
 		? `Add rationale comments in ${relativePath} containing at least ${rule.minMatches} of: ${rule.commentKeywords.join(", ")}.`
 		: undefined;
@@ -352,53 +556,21 @@ function parseExportDeclaration(
 	return { kind: match[1] as DocumentationDeclarationKind, name: match[2] };
 }
 
-function findPrecedingTsdoc(
-	lines: string[],
-	declarationIndex: number,
-): string | undefined {
-	let index = declarationIndex - 1;
-	while (index >= 0 && lines[index].trim().length === 0) {
-		index -= 1;
-	}
-	if (index < 0 || !lines[index].trim().endsWith("*/")) return undefined;
-
-	const end = index;
-	while (index >= 0 && !lines[index].includes("/**")) {
-		index -= 1;
-	}
-	if (index < 0) return undefined;
-	return lines.slice(index, end + 1).join("\n");
-}
-
-function extractCommentLines(
-	content: string,
-): Array<{ line: number; text: string }> {
-	const result: Array<{ line: number; text: string }> = [];
-	const lines = content.split(/\r?\n/);
-	for (let index = 0; index < lines.length; index += 1) {
-		const match = /\/\/\s*(.*)|\/\*+\s*(.*?)\s*\*\//.exec(lines[index]);
-		if (match) {
-			result.push({ line: index + 1, text: match[1] ?? match[2] ?? "" });
-		}
-	}
-	return result;
-}
-
-function extractComments(content: string): string[] {
-	const comments: string[] = [];
-	for (const match of content.matchAll(/\/\/([^\n]*)|\/\*[\s\S]*?\*\//g)) {
-		comments.push(match[1] ?? match[0]);
-	}
-	return comments;
-}
-
 function parseRuleKind(value: unknown): DocumentationRuleKind | undefined {
 	return value === "requireTsdocOnExports" ||
+		value === "requireFileOverview" ||
 		value === "forbidFileHeaders" ||
+		value === "forbidCommentPatterns" ||
 		value === "todoFormat" ||
 		value === "requireRationaleComments"
 		? value
 		: undefined;
+}
+
+function parseTodoFormat(value: unknown): TodoFormat {
+	return value === "TAG: concrete action - referent"
+		? value
+		: "TAG: description";
 }
 
 function parseDeclarationKind(value: string): string {
