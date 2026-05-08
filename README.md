@@ -30,7 +30,7 @@ When active policies exist, the extension injects a compact `## Conventions` sum
 | `/conventions audit --include-ignored` | Include Git-ignored files                                                                       |
 | `/conventions audit --changed`         | Audit only locally changed files (staged + unstaged + untracked; deleted files skipped)         |
 | `--json`                               | Machine-readable output (works on `check` and `audit`)                                          |
-| `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`, `package` |
+| `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`, `package`, `files` |
 
 ## Config shape
 
@@ -112,6 +112,8 @@ Each rule/limit accepts an optional `id` (surfaced in diagnostics as `policy:id`
 
 **Documentation** — deterministic rules: `requireTsdocOnExports`, `requireFileOverview`, `forbidFileHeaders`, `forbidCommentPatterns`, `todoFormat`, `requireRationaleComments`.
 
+**Files** — deterministic repo shape checks: `require` (must exist), `forbid` (must not exist), or `source` + `requireAny` for source/companion pairing with `{stem}`/`{dir}`/`{path}` placeholders. Required-file checks fire during `audit`; pairing and forbid fire per-file (write/edit and check).
+
 **Package** — manifest hygiene for npm/Pi packages: `requireFields`, `requireFiles`, `piPackage.requireKeyword`, `piPackage.verifyResourcePaths` (verifies `pi.extensions[]`/`pi.skills[]` paths exist), and `npm.requireFilesCoverage` (verifies `package.json` `files` covers configured entries). All checks are local file/JSON — no network, no `npm publish`.
 
-All policies default to `warn` and are additive — present only what you configure. Modes: `warn`, `confirm`, `block`. See `examples/` for focused starting points (`conventions.size.json`, `conventions.documentation.json`, `conventions.dependencies.json`, `conventions.package.json`, `conventions.extends-global.json`).
+All policies default to `warn` and are additive — present only what you configure. Modes: `warn`, `confirm`, `block`. See `examples/` for focused starting points (`conventions.size.json`, `conventions.documentation.json`, `conventions.dependencies.json`, `conventions.package.json`, `conventions.files.json`, `conventions.extends-global.json`).

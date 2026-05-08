@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { normalizeDependenciesPolicy } from "../policies/dependencies.ts";
 import { normalizeDocumentationPolicy } from "../policies/documentation.ts";
+import { normalizeFilesPolicy } from "../policies/files.ts";
 import { normalizeNamingPolicy } from "../policies/naming.ts";
 import { normalizePackagePolicy } from "../policies/package.ts";
 import { normalizeSizePolicy } from "../policies/size.ts";
@@ -62,7 +63,8 @@ export function hasActivePolicies(config: ConventionsConfig): boolean {
 			config.policies.documentation ||
 			config.policies.size ||
 			config.policies.dependencies ||
-			config.policies.package,
+			config.policies.package ||
+			config.policies.files,
 	);
 }
 
@@ -172,6 +174,7 @@ function normalizeConventionsConfig(
 				envelope?.policies?.dependencies,
 			),
 			package: normalizePackagePolicy(envelope?.policies?.package),
+			files: normalizeFilesPolicy(envelope?.policies?.files),
 		},
 	};
 }
@@ -217,6 +220,11 @@ function mergeRawConventionsConfig(
 			package: mergePackagePolicy(
 				globalConfig?.policies?.package,
 				projectConfig?.policies?.package,
+			),
+			files: mergeRulePolicy(
+				globalConfig?.policies?.files,
+				projectConfig?.policies?.files,
+				"rules",
 			),
 		},
 	};

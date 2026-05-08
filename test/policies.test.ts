@@ -15,6 +15,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	evaluateFilesGlobalRequireFindings,
+	evaluateFilesViolation,
+	normalizeFilesPolicy,
+} from "../src/policies/files.ts";
+import {
 	evaluatePackageViolation,
 	normalizePackagePolicy,
 } from "../src/policies/package.ts";
@@ -881,5 +886,100 @@ describe("package policy", () => {
 			undefined,
 		);
 		expect(violation?.reason).toContain("not valid JSON");
+	});
+});
+
+describe("files policy", () => {
+	it("flags missing required file via global pass", () => {
+		const dir = mkdtempSync(join(tmpdir(), "files-policy-req-"));
+		try {
+			const config = normalizeFilesPolicy({
+				rules: [{ id: "agents", require: ["AGENTS.md"] }],
+			});
+			const findings = evaluateFilesGlobalRequireFindings(config!, dir);
+			expect(findings).toHaveLength(1);
+			expect(findings[0].relativePath).toBe("AGENTS.md");
+			expect(findings[0].violation.ruleId).toBe("agents");
+
+			writeFileSync(join(dir, "AGENTS.md"), "hi");
+			expect(
+				evaluateFilesGlobalRequireFindings(config!, dir),
+			).toHaveLength(0);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("flags forbidden files", () => {
+		const config = normalizeFilesPolicy({
+			rules: [{ id: "no-eslintrc", forbid: [".eslintrc.json"] }],
+		});
+		const v = evaluateFilesViolation(".eslintrc.json", true, config!, undefined);
+		expect(v?.ruleId).toBe("no-eslintrc");
+	});
+
+	it("flags source files missing required companion", () => {
+		const dir = mkdtempSync(join(tmpdir(), "files-policy-pair-"));
+		try {
+			mkdirSync(join(dir, "src"));
+			writeFileSync(join(dir, "src/foo.ts"), "");
+			const config = normalizeFilesPolicy({
+				rules: [
+					{
+						id: "source-has-test",
+						source: ["src/**"],
+						requireAny: ["test/{stem}.test.ts"],
+					},
+				],
+			});
+			const missing = evaluateFilesViolation(
+				"src/foo.ts",
+				true,
+				config!,
+				dir,
+			);
+			expect(missing?.ruleId).toBe("source-has-test");
+			expect(missing?.reason).toContain("test/foo.test.ts");
+
+			mkdirSync(join(dir, "test"));
+			writeFileSync(join(dir, "test/foo.test.ts"), "");
+			const pass = evaluateFilesViolation(
+				"src/foo.ts",
+				true,
+				config!,
+				dir,
+			);
+			expect(pass).toBeUndefined();
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("respects exclude on pairing rules", () => {
+		const dir = mkdtempSync(join(tmpdir(), "files-policy-exclude-"));
+		try {
+			const config = normalizeFilesPolicy({
+				rules: [
+					{
+						source: ["src/**"],
+						exclude: ["src/index.ts"],
+						requireAny: ["test/{stem}.test.ts"],
+					},
+				],
+			});
+			expect(
+				evaluateFilesViolation("src/index.ts", true, config!, dir),
+			).toBeUndefined();
+			expect(
+				evaluateFilesViolation("src/other.ts", true, config!, dir),
+			).toBeDefined();
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("returns undefined when policy has no actionable rules", () => {
+		expect(normalizeFilesPolicy({})).toBeUndefined();
+		expect(normalizeFilesPolicy({ rules: [] })).toBeUndefined();
 	});
 });

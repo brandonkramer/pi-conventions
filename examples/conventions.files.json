@@ -1,0 +1,27 @@
+{
+  "$schema": "../schemas/conventions.schema.json",
+  "policies": {
+    "files": {
+      "mode": "warn",
+      "rules": [
+        {
+          "id": "agent-instructions",
+          "require": ["AGENTS.md"],
+          "reason": "AGENTS.md is required for agent context."
+        },
+        {
+          "id": "no-orphan-config",
+          "forbid": [".eslintrc.json"],
+          "reason": "Project standardized on biome.json; remove eslintrc."
+        },
+        {
+          "id": "source-has-test",
+          "source": ["src/**/*.ts"],
+          "exclude": ["src/index.ts", "src/**/*.d.ts"],
+          "requireAny": ["test/{stem}.test.ts"],
+          "reason": "Each source file needs a sibling test."
+        }
+      ]
+    }
+  }
+}

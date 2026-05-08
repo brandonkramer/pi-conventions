@@ -464,6 +464,24 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 		}
 	}
 
+	if (config.policies.files) {
+		const policy = config.policies.files;
+		lines.push(`Files policy: create ${policy.mode}; edit ${policy.editMode}.`);
+		for (const rule of policy.rules) {
+			if (rule.require.length > 0) {
+				lines.push(`- require: ${rule.require.join(",")}`);
+			}
+			if (rule.forbid.length > 0) {
+				lines.push(`- forbid: ${rule.forbid.join(",")}`);
+			}
+			if (rule.source.length > 0 && rule.requireAny.length > 0) {
+				lines.push(
+					`- ${rule.source.join(",")} -> requireAny ${rule.requireAny.join(",")}`,
+				);
+			}
+		}
+	}
+
 	if (config.policies.package) {
 		const policy = config.policies.package;
 		lines.push(
@@ -522,6 +540,7 @@ function activePolicySummary(config: ConventionsConfig): string {
 	if (config.policies.size) policies.push("size");
 	if (config.policies.dependencies) policies.push("dependencies");
 	if (config.policies.package) policies.push("package");
+	if (config.policies.files) policies.push("files");
 	return policies.length > 0 ? policies.join(", ") : "no active policies";
 }
 

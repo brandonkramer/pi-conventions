@@ -7,6 +7,7 @@ import {
 	documentationPolicyMatchesPath,
 	evaluateDocumentationViolation,
 } from "../policies/documentation.ts";
+import { evaluateFilesViolation } from "../policies/files.ts";
 import { evaluateNamingViolation } from "../policies/naming.ts";
 import {
 	evaluatePackageViolation,
@@ -96,6 +97,16 @@ export function collectViolations(
 			input.exists,
 			input.content,
 			config.policies.package,
+			input.cwd,
+		);
+		if (violation) violations.push(violation);
+	}
+
+	if (config.policies.files) {
+		const violation = evaluateFilesViolation(
+			input.relativePath,
+			input.exists,
+			config.policies.files,
 			input.cwd,
 		);
 		if (violation) violations.push(violation);

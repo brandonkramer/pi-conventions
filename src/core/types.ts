@@ -8,6 +8,10 @@ import type {
 	RawDocumentationPolicyConfig,
 } from "../policies/documentation.ts";
 import type {
+	FilesPolicyConfig,
+	RawFilesPolicyConfig,
+} from "../policies/files.ts";
+import type {
 	NamingPolicyConfig,
 	RawNamingPolicyConfig,
 } from "../policies/naming.ts";
@@ -44,6 +48,7 @@ export interface RawConventionsConfig {
 		size?: RawSizePolicyConfig;
 		dependencies?: RawDependenciesPolicyConfig;
 		package?: RawPackagePolicyConfig;
+		files?: RawFilesPolicyConfig;
 	};
 }
 
@@ -61,6 +66,7 @@ export interface ConventionsConfig {
 		size?: SizePolicyConfig;
 		dependencies?: DependenciesPolicyConfig;
 		package?: PackagePolicyConfig;
+		files?: FilesPolicyConfig;
 	};
 }
 

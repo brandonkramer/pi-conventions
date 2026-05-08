@@ -8,6 +8,7 @@ import {
 	needsContentForPath,
 	strongestViolation,
 } from "./evaluate.ts";
+import { evaluateFilesGlobalRequireFindings } from "../policies/files.ts";
 import { matchesAnyPathPattern } from "./pattern.ts";
 import { normalizeRelativePath, pathExists } from "./path.ts";
 import type { ConventionsConfig, Violation } from "./types.ts";
@@ -34,6 +35,7 @@ export const KNOWN_POLICY_IDS = [
 	"size",
 	"dependencies",
 	"package",
+	"files",
 ] as const;
 export type KnownPolicyId = (typeof KNOWN_POLICY_IDS)[number];
 
@@ -106,6 +108,17 @@ export async function auditConventions(
 		)) {
 			if (options.policy && violation.policyId !== options.policy) continue;
 			findings.push({ relativePath, violation });
+		}
+	}
+
+	if (config.policies.files) {
+		for (const finding of evaluateFilesGlobalRequireFindings(
+			config.policies.files,
+			cwd,
+		)) {
+			if (options.policy && finding.violation.policyId !== options.policy)
+				continue;
+			findings.push(finding);
 		}
 	}
 
