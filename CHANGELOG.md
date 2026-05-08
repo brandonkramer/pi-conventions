@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Add dependencies policy for lightweight relative import-boundary enforcement.
+  - Supports repo-relative `from`/`to` path rules with `exclude` exemptions.
+  - Evaluates static import/export specifiers and relative dynamic imports on write/edit and audit.
+  - Updates schema, README, examples, runtime prompt summary, and conventions-guard skill guidance.
+
 ## 0.2.4
 
 - Simplify: remove 81 lines and 20 functions without changing behavior (`chore`).
