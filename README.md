@@ -1,6 +1,6 @@
 # pi-conventions
 
-**Pi package** for enforcing codebase conventions.
+**Pi package** for enforcing deterministic codebase conventions: structure, naming, documentation, size, and lightweight dependency boundaries.
 
 ## Install
 
@@ -60,6 +60,8 @@ Language-specific create commands copy from the examples folder.
 
 The companion skill is optional and exists only for guided review and tuning after creation.
 
+When active policies exist, the extension injects a compact `## Conventions` system-prompt summary so agents see the current guardrails before editing. Runtime checks still enforce the full normalized config on write/edit and diagnostics commands.
+
 `/conventions create` and `/conventions create rust|typescript|ts|go|python|documentation` scaffold:
 
 - `.pi/conventions.json`
@@ -105,6 +107,28 @@ Diagnostics commands:
         }
       ]
     },
+    "size": {
+      "mode": "warn",
+      "limits": [
+        {
+          "prefixes": ["src/"],
+          "extensions": ["ts", "tsx", "rs", "go"],
+          "maxLines": 500,
+          "reason": "Split large files by responsibility."
+        }
+      ]
+    },
+    "dependencies": {
+      "mode": "block",
+      "rules": [
+        {
+          "from": ["src/**/*.ts"],
+          "exclude": ["src/extract/**"],
+          "to": ["src/extract/verticals/**"],
+          "reason": "Vertical extractors are reached through src/extract/registry.ts only."
+        }
+      ]
+    },
     "documentation": {
       "mode": "warn",
       "rules": [
@@ -129,22 +153,17 @@ Diagnostics commands:
         }
       ]
     },
-    "size": {
-      "mode": "warn",
-      "limits": [
-        {
-          "prefixes": ["src/"],
-          "extensions": ["ts", "tsx", "rs", "go"],
-          "maxLines": 500,
-          "reason": "Split large files by responsibility."
-        }
-      ]
-    }
   }
 }
 ```
 
 What it enforces:
+
+- path placement and architecture-zone conventions
+- stable file/directory naming conventions
+- deterministic documentation hygiene
+- file size budgets
+- lightweight relative import-boundary rules
 
 ### Structure policy
 
@@ -161,7 +180,35 @@ What it enforces:
 - scope rules to selected extensions and path kinds
 - warn, confirm, or block on create/edit
 
-### Documentation policy (optional)
+### Dependencies policy 
+
+Dependency checks are additive and disabled unless `policies.dependencies` is present. They inspect post-mutation file content for `write` and `edit` calls, run during audits when matching files are scanned, and default to `warn`.
+
+Supported deterministic rule fields:
+
+- `from` — source file path patterns to check
+- `exclude` — source path patterns exempt from the rule
+- `to` — resolved repo-relative target path patterns that are forbidden
+- `reason` — project-specific explanation shown in guard output
+
+The policy only scans static `import` / `export ... from` specifiers and relative dynamic imports like `import("../x.js")`. Relative specifiers are normalized to repo-relative paths before matching. It intentionally does not perform TypeScript compiler resolution, path alias resolution, package export-map resolution, call graph analysis, circular dependency detection, or framework-specific module semantics.
+
+### Size policy 
+
+Size checks are additive and disabled unless `policies.size` is present. They inspect file content when available and default to `warn`.
+
+Supported deterministic limits:
+
+- `maxLines` — warn/confirm/block when matching files exceed a configured line count
+- `maxBytes` — warn/confirm/block when matching files exceed a configured UTF-8 byte count
+- `extensions` — scope a limit to selected file extensions, including `d.ts`
+- `ignoreBlankLines` and `ignoreCommentLines` — optionally count only substantive lines
+
+Use size policy to catch files that should be split by responsibility before they become hard to review. See `examples/conventions.size.json` for a focused starting point.
+
+Size policy can also live in the global fallback config at `~/.pi/agent/conventions.json`. Project configs can inherit those global limits with top-level `"extendsGlobal": true`, which is useful when global size rules should act as a default file-size guard while each repo still owns its local structure/naming/docs rules. See `examples/conventions.extends-global.json` for a project config that layers local rules on top of global defaults.
+
+### Documentation policy
 
 Documentation checks are additive and disabled unless `policies.documentation` is present. They inspect post-mutation file content for `write` and `edit` calls and default to `warn`.
 
@@ -177,18 +224,3 @@ Supported deterministic rules:
 Scope documentation rules narrowly and exclude generated, vendored, or unusually large files when possible. Content checks are deterministic and intentionally simple, so matching very large files can add linear scan cost to write/edit hooks.
 
 See `examples/conventions.documentation.json` for a documentation-focused example, or scaffold it with `/conventions create documentation`.
-
-### Size policy (optional)
-
-Size checks are additive and disabled unless `policies.size` is present. They inspect file content when available and default to `warn`.
-
-Supported deterministic limits:
-
-- `maxLines` — warn/confirm/block when matching files exceed a configured line count
-- `maxBytes` — warn/confirm/block when matching files exceed a configured UTF-8 byte count
-- `extensions` — scope a limit to selected file extensions, including `d.ts`
-- `ignoreBlankLines` and `ignoreCommentLines` — optionally count only substantive lines
-
-Use size policy to catch files that should be split by responsibility before they become hard to review. See `examples/conventions.size.json` for a focused starting point.
-
-Size policy can also live in the global fallback config at `~/.pi/agent/conventions.json`. Project configs can inherit those global limits with top-level `"extendsGlobal": true`, which is useful when global size rules should act as a default file-size guard while each repo still owns its local structure/naming/docs rules. See `examples/conventions.extends-global.json` for a project config that layers local rules on top of global defaults.

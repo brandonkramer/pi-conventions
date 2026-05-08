@@ -1,4 +1,8 @@
 import {
+	dependenciesPolicyMatchesPath,
+	evaluateDependenciesViolation,
+} from "../policies/dependencies.ts";
+import {
 	documentationPolicyMatchesPath,
 	evaluateDocumentationViolation,
 } from "../policies/documentation.ts";
@@ -66,6 +70,16 @@ export function collectViolations(
 		if (violation) violations.push(violation);
 	}
 
+	if (config.policies.dependencies && input.content !== undefined) {
+		const violation = evaluateDependenciesViolation(
+			input.relativePath,
+			input.exists,
+			input.content,
+			config.policies.dependencies,
+		);
+		if (violation) violations.push(violation);
+	}
+
 	return violations;
 }
 
@@ -80,7 +94,12 @@ export function needsContentForPath(
 				config.policies.documentation,
 			)) ||
 			(config.policies.size &&
-				sizePolicyMatchesPath(relativePath, config.policies.size)),
+				sizePolicyMatchesPath(relativePath, config.policies.size)) ||
+			(config.policies.dependencies &&
+				dependenciesPolicyMatchesPath(
+					relativePath,
+					config.policies.dependencies,
+				)),
 	);
 }
 

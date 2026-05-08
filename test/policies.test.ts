@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	evaluateDependenciesViolation,
+	normalizeDependenciesPolicy,
+} from "../src/policies/dependencies.ts";
+import {
 	evaluateDocumentationViolation,
 	normalizeDocumentationPolicy,
 } from "../src/policies/documentation.ts";
@@ -377,6 +381,64 @@ describe("size policy", () => {
 				"src/file.ts",
 				false,
 				"// note\n\nconst a = 1;\nconst b = 2;\n",
+				config!,
+			),
+		).toBeUndefined();
+	});
+});
+
+describe("dependencies policy", () => {
+	it("blocks relative imports into configured boundaries", () => {
+		const config = normalizeDependenciesPolicy({
+			mode: "block",
+			rules: [
+				{
+					from: ["src/**/*.ts"],
+					exclude: ["src/extract/**"],
+					to: ["src/extract/verticals/**"],
+					reason:
+						"Vertical extractors are reached through src/extract/registry.ts only.",
+				},
+			],
+		});
+
+		const violation = evaluateDependenciesViolation(
+			"src/features/reddit.ts",
+			false,
+			"import { reddit } from '../extract/verticals/reddit.js';\n",
+			config!,
+		);
+		expect(violation).toMatchObject({
+			policyId: "dependencies",
+			mode: "block",
+		});
+		expect(violation?.reason).toContain("registry.ts");
+	});
+
+	it("allows excluded sources and ignores package imports", () => {
+		const config = normalizeDependenciesPolicy({
+			rules: [
+				{
+					from: ["src/**/*.ts"],
+					exclude: ["src/extract/**"],
+					to: ["src/extract/verticals/**"],
+				},
+			],
+		});
+
+		expect(
+			evaluateDependenciesViolation(
+				"src/extract/registry.ts",
+				false,
+				"export { reddit } from './verticals/reddit.js';\n",
+				config!,
+			),
+		).toBeUndefined();
+		expect(
+			evaluateDependenciesViolation(
+				"src/features/reddit.ts",
+				false,
+				"import { createRequire } from 'node:module';\n",
 				config!,
 			),
 		).toBeUndefined();

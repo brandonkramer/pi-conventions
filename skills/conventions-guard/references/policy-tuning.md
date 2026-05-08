@@ -1,139 +1,118 @@
 # Policy Tuning
 
-Tune the repo-local `.pi/conventions.json` after `/conventions create`, or after copying one of the shipped examples into a repo.
+Tune `.pi/conventions.json` after `/conventions create` or after copying a shipped example.
 
-## Rules
+## Required workflow
 
-1. Keep `policies.structure` focused on file placement and architecture zones.
-2. Use `policies.structure.legacyZones[].onCreate` and `onEdit` when a directory is in transition.
-3. Keep `policies.structure.forbiddenSegments` short and obvious.
-   - good: `utils`, `helpers`, `common`, `misc`
-   - only add `shared` when it has actually become a junk-drawer in that repo
-4. Enable `policies.structure.newTopLevelFiles` only when the architecture zones are already declared and stable.
-5. Prefer `warn` or `confirm` for existing-file edits in migration zones before switching them to `block`.
-6. Use `policies.naming` only for stable conventions that are worth enforcing.
-7. Use optional `policies.documentation` only for deterministic comment checks such as TSDoc presence, TODO/FIXME format, forbidden headers, or configured rationale keywords.
-8. Use optional `policies.size` for deterministic line/byte budgets on selected paths; prefer `warn` until limits are proven low-noise.
-9. Use top-level `extendsGlobal: true` when a repo should inherit global fallback policies such as a default `policies.size` guard.
-10. Keep top-level `notes` short and repo-specific.
+1. Read current config first.
+2. For broad changes, run `/conventions audit` before tightening.
+3. Add/change the narrowest deterministic rule that closes the gap.
+4. Prefer `warn` -> audit -> `confirm`/`block` for noisy policies.
+5. Re-run `/conventions audit` or targeted `/conventions check <path>`.
+6. Fix or report any warnings on files you touched.
 
-## Common Patterns
+## Invariants
 
-| Situation                      | Suggested policy                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Greenfield layered repo        | structure create `block`, edit `warn`, top-level rule enabled only when entrypoints are clear                   |
-| Mid-migration repo             | structure create `block`, edit `warn`, explicit legacy zones                                                    |
-| Loose legacy repo              | structure create `warn`, edit `warn`, top-level rule disabled                                                   |
-| Naming conventions still fluid | omit `policies.naming` or keep it narrow and warn-only                                                          |
-| Documentation guidance needed  | add `policies.documentation` with `mode: warn`; keep subjective comment-quality guidance in AGENTS/README prose |
-| Large files growing unchecked  | add `policies.size` with `maxLines` or `maxBytes`; scope by prefix and extension                                |
-| Global defaults should apply   | set project `extendsGlobal: true`; absent/false preserves fallback-only replacement behavior                    |
+- Match repo reality; do not encode aspirational architecture.
+- Keep rules deterministic, scoped, and low-noise.
+- Keep `notes` short and repo-specific.
+- Every exception needs a reason; no silent special cases.
+- If a rule is mandatory for agents, use `confirm`/`block` or document the follow-up workflow.
 
-## Language and framework guidance
+## Policy rules
 
-### Structure policy forbidden segments
+### Structure
 
-These are safe to add in any language:
+- Scope to file placement and architecture zones.
+- `forbiddenSegments`: safe defaults `utils`, `helpers`, `common`, `misc`; add `shared` only if it is a junk drawer.
+- `legacyZones[].onCreate/onEdit`: directories in transition.
+- `newTopLevelFiles`: only when zones/entrypoints are stable.
+- Modes: new-file placement mistakes can be `block`; migration edits start `warn`/`confirm`.
 
-```json
-["utils", "helpers", "common", "misc"]
-```
+Never forbid legitimate framework/toolchain dirs:
 
-Additional segments to consider only when they have become junk-drawers:
+- Go: `internal`, `cmd`, `pkg`
+- Astro: `pages`, `layouts`, `components`, `actions`, `content`, `styles`, `assets`, `icons`
+- Next.js: `app`, `api`, `(group)`, `@slot`
+- Rust: `crates`, `target`
+- Python: `src`, `tests`, `.venv`
+- npm workspaces: `apps`, `packages`, `node_modules`
 
-| Stack              | Additional segment |
-| ------------------ | ------------------ |
-| TypeScript / React | `shared`           |
-| Astro              | `shared`           |
-| Go                 | `shared`           |
+### Naming
 
-Do **not** add legitimate framework or toolchain directories to forbidden segments.
+Use only for stable conventions worth enforcing.
 
-| Language / framework | Keep these                                                                          |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| Go                   | `internal`, `cmd`, `pkg`                                                            |
-| Astro                | `pages`, `layouts`, `components`, `actions`, `content`, `styles`, `assets`, `icons` |
-| Next.js              | `app`, `api`, `(group)` route groups, `@slot` parallel routes                       |
-| Rust workspaces      | `crates`, `target`                                                                  |
-| Python               | `src`, `tests`, `.venv`                                                             |
-| npm workspaces       | `apps`, `packages`, `node_modules`                                                  |
+- Rust/Python: usually `snake_case` modules/packages.
+- TypeScript: `kebab-case` only when repo already uses it.
+- React: components/providers often `PascalCase`; support files/folders often `kebab-case`; hooks follow repo convention.
+- Astro: components/layouts often `PascalCase`; content slugs usually `kebab-case`; avoid fighting `src/pages/` routes.
+- Go: do not blanket-force `snake_case`; prefer blocking generic names.
 
-### Naming policy guidance
+### Documentation
 
-- **Rust**: use `snake_case` for module files and directories.
-- **Python**: use `snake_case` for module files and package directories.
-- **TypeScript**: use `kebab-case` when the repo already treats source files and directories that way.
-- **React**: shared component or provider files are often `PascalCase`; support modules and folders are often `kebab-case`; hooks should follow the repo's real convention rather than an arbitrary rule.
-- **Astro**: component and layout `.astro` files are often `PascalCase`; content slugs are usually `kebab-case`; avoid naming rules that fight `src/pages/` route conventions.
-- **Go**: do **not** force `snake_case` as a blanket rule. Go files and packages are usually short lowercase names. Prefer blocking generic catch-all names over a strict case policy.
+Use deterministic checks only; leave subjective comment quality to AGENTS/README prose.
 
-### Documentation policy guidance
+Supported: `requireTsdocOnExports`, `requireFileOverview`, `forbidFileHeaders`, `forbidCommentPatterns`, `todoFormat`, `requireRationaleComments`.
 
-Documentation rules inspect post-mutation file content on write/edit. Keep them narrow and warn-first:
+- Start `warn` unless proven low-noise.
+- Scope paths narrowly; exclude generated/vendor/large files.
+- For agent-must-follow rules like `@fileoverview`, prefer `block` once existing findings are resolved.
+- Checks are linear scans of matching post-mutation content.
 
-- `requireTsdocOnExports` for exported contracts in selected files or globs.
-- `requireFileOverview` for leading module TSDoc with `@fileoverview` and configured section markers such as `Design:`.
-- `forbidFileHeaders` for blanket license/copyright/SPDX headers where the repo does not want them.
-- `forbidCommentPatterns` for repo-specific banned comment references, such as tickets or PR numbers.
-- `todoFormat` for `TODO: description` / `FIXME: description`, or stricter `TODO: concrete action - referent`, comments.
-- `requireRationaleComments` for sensitive paths that should include configured security/invariant keywords.
+### Size
 
-Do not use documentation policy to judge whether comments are “good”, whether code is obvious, or whether tests self-document. Convert subjective guidance into deterministic proxies, and leave the rest as compact notes.
+Use for reviewability/file-splitting pressure.
 
-Exclude generated, vendored, or unusually large files where possible. Documentation checks are linear content scans when a rule matches a path.
+- Start `warn`; move to `block` only when the limit is an accepted hard cap.
+- Scope by `prefixes` + `extensions`.
+- `maxLines` = reviewability; `maxBytes` = generated/data-like files.
+- `ignoreBlankLines`/`ignoreCommentLines` only if team agrees.
+- Avoid generated/vendor directories.
 
-### Size policy guidance
+### Dependencies
 
-Use `policies.size` to catch files that should be split by responsibility before they become hard to review.
+Use for lightweight relative import boundaries, not full linting.
 
-- Start with `mode: warn` and `editMode: warn`.
-- Scope limits by `prefixes` and `extensions` instead of applying one global budget to every file.
-- Use `maxLines` for reviewability and `maxBytes` for generated or data-like files.
-- Use `ignoreBlankLines` or `ignoreCommentLines` only when the team agrees those lines should not count toward the budget.
-- Avoid matching generated/vendor directories; audit/check can help tune noisy limits before blocking.
+- Rule shape: `from`, optional `exclude`, `to`, optional `reason`.
+- Good use: block imports into implementation-only verticals except via a registry.
+- Keep path patterns repo-relative and narrow.
+- No TS compiler resolution, path aliases, package exports, call graph, circular deps, or framework semantics.
+- For full import architecture, use a linter/dependency tool instead.
 
 ### Global fallback layering
 
-By default, a project `.pi/conventions.json` replaces the global fallback config at `~/.pi/agent/conventions.json`. Add top-level `extendsGlobal: true` to inherit global policies and layer project rules on top.
+Default: project `.pi/conventions.json` replaces `~/.pi/agent/conventions.json`.
+Use `extendsGlobal: true` only when global policies should layer in.
 
-Use this when global defaults, especially `policies.size`, should apply across projects while each repo still owns local structure, naming, or documentation rules.
+- Global notes/rules appear before project notes/rules.
+- Global naming/docs/size/dependencies evaluate before project rules.
+- Keep fallback mostly `warn` so it works across unrelated projects.
 
-Keep in mind:
+## Common choices
 
-- Absent or `false` preserves existing fallback-only behavior.
-- Global notes are shown before project notes.
-- Global naming, documentation, and size rules are evaluated before project rules.
-- Project configs should still scope local rules narrowly to avoid noisy inherited + local checks.
+- Greenfield layered repo: structure create `block`, edit `warn`; top-level rule only after entrypoints are clear.
+- Mid-migration: structure create `block`, edit `warn`; explicit legacy zones.
+- Loose legacy repo: structure create/edit `warn`; top-level rule disabled.
+- Fluid naming: omit naming or keep narrow + warn-only.
+- Documentation guidance: deterministic docs rules with `warn`; make mandatory only after cleanup.
+- Large files growing: scoped size limits.
+- Global defaults: project `extendsGlobal: true`.
 
-### Create vs edit behavior
+## Linter boundary
 
-- Use `block` for obvious new-file placement mistakes.
-- Use `warn` or `confirm` for edits in legacy zones during migration.
-- Keep documentation policy mostly `warn` because comment checks can have false positives.
-- Keep size policy `warn` until limits have been audited against the current repo.
-- Keep the fallback config mostly `warn` so it stays safe across unrelated projects.
+Conventions guard covers placement, stable naming, deterministic docs, size, and lightweight relative import boundaries. Linters cover broader code quality/import graphs.
 
-## Linter overlap
+Examples: ESLint boundaries/Biome, `go-arch-lint`, `clippy`, Ruff, Astro/React framework lint.
 
-Conventions guard enforces where files live, what stable names are acceptable, optional deterministic documentation hygiene, and optional size budgets. Linters enforce import direction and broader code quality. Avoid duplicating effort.
+If both are active, add a note: `<tool> enforces imports/code quality; conventions guard enforces placement/naming/docs/size/lightweight boundaries.`
 
-| Stack              | Linter or tool                                | What it covers that conventions guard does not            |
-| ------------------ | --------------------------------------------- | --------------------------------------------------------- |
-| TypeScript / React | `eslint-plugin-boundaries`, Biome, or similar | Import direction between layers and circular dependencies |
-| Go                 | `go-arch-lint`                                | Import path rules against declared architecture YAML      |
-| Rust               | `clippy`                                      | Code quality and unsafe or non-idiomatic patterns         |
-| Python             | Ruff                                          | Linting, formatting, and import sorting                   |
-| Astro              | ESLint / framework linting as applicable      | JSX/TS integration issues, framework code quality checks  |
+## Done when
 
-When both conventions guard and a linter are active, add a note like: `"<tool> enforces imports or code quality; conventions guard enforces file placement and naming."`
-
-## Completion Checklist
-
-- [ ] Structure layers map to real directories.
-- [ ] Structure legacy zones reflect current migration boundaries.
-- [ ] Structure top-level file exceptions list only real entrypoints or intentional exceptions.
-- [ ] Naming rules reflect stable conventions, not temporary preferences.
-- [ ] Documentation rules are deterministic and warn-first unless the team has already proven they are low-noise.
-- [ ] Size limits are scoped narrowly enough to avoid generated/vendor files.
-- [ ] Forbidden segments do not accidentally block legitimate framework or toolchain directories.
-- [ ] Notes are short and repo-specific.
+- Warnings on touched files fixed or explicitly reported.
+- Structure maps to real directories and migration boundaries.
+- Top-level file exceptions are real entrypoints/intentional exceptions.
+- Naming reflects stable conventions.
+- Docs/size/dependency rules are deterministic, scoped, and low-noise.
+- Forbidden segments do not block legitimate framework/toolchain dirs.
+- Notes are short and repo-specific.
+- Audit/check result was run or skipped with rationale.

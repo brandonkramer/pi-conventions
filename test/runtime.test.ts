@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { needsContentForPath } from "../src/core/evaluate.ts";
 import conventionsGuard from "../src/index.ts";
+import { normalizeDependenciesPolicy } from "../src/policies/dependencies.ts";
 import { normalizeDocumentationPolicy } from "../src/policies/documentation.ts";
 import {
 	createTempDir,
@@ -136,6 +137,76 @@ describe("runtime documentation policy", () => {
 				path: ".pi/conventions.json",
 				notes: [],
 				policies: { documentation },
+			}),
+		).toBe(true);
+	});
+});
+
+describe("runtime dependencies policy", () => {
+	it("evaluates dependency violations against write content", async () => {
+		const repo = await createTempDir("pcg-runtime-dependencies-write-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					dependencies: {
+						mode: "block",
+						rules: [
+							{
+								from: ["src/**/*.ts"],
+								exclude: ["src/extract/**"],
+								to: ["src/extract/verticals/**"],
+								reason:
+									"Vertical extractors are reached through src/extract/registry.ts only.",
+							},
+						],
+					},
+				},
+			});
+			const { handlers } = createHarness();
+			const result = await handlers.get("tool_call")!(
+				{
+					toolName: "write",
+					toolCallId: "call-1",
+					input: {
+						path: "src/features/reddit.ts",
+						content:
+							"import { reddit } from '../extract/verticals/reddit.js';\n",
+					},
+				},
+				{ cwd: repo, hasUI: false, ui: { notify: () => undefined } },
+			);
+
+			expect(result).toMatchObject({ block: true });
+			expect(result.reason).toContain("Dependencies policy");
+			expect(result.reason).toContain("registry.ts");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("prefilters paths before dependency checks", () => {
+		const dependencies = normalizeDependenciesPolicy({
+			rules: [
+				{
+					from: ["src/**/*.ts"],
+					exclude: ["src/extract/**"],
+					to: ["src/extract/verticals/**"],
+				},
+			],
+		});
+
+		expect(
+			needsContentForPath("src/extract/registry.ts", {
+				path: ".pi/conventions.json",
+				notes: [],
+				policies: { dependencies },
+			}),
+		).toBe(false);
+		expect(
+			needsContentForPath("src/features/reddit.ts", {
+				path: ".pi/conventions.json",
+				notes: [],
+				policies: { dependencies },
 			}),
 		).toBe(true);
 	});

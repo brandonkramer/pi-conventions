@@ -1,0 +1,16 @@
+{
+  "$schema": "../schemas/conventions.schema.json",
+  "policies": {
+    "dependencies": {
+      "mode": "block",
+      "rules": [
+        {
+          "from": ["src/**/*.ts"],
+          "exclude": ["src/extract/**"],
+          "to": ["src/extract/verticals/**"],
+          "reason": "Vertical extractors are reached through src/extract/registry.ts only."
+        }
+      ]
+    }
+  }
+}

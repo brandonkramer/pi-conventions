@@ -1,4 +1,8 @@
 import type {
+	DependenciesPolicyConfig,
+	RawDependenciesPolicyConfig,
+} from "../policies/dependencies.ts";
+import type {
 	DocumentationPolicyConfig,
 	RawDocumentationPolicyConfig,
 } from "../policies/documentation.ts";
@@ -31,6 +35,7 @@ export interface RawConventionsConfig {
 		naming?: RawNamingPolicyConfig;
 		documentation?: RawDocumentationPolicyConfig;
 		size?: RawSizePolicyConfig;
+		dependencies?: RawDependenciesPolicyConfig;
 	};
 }
 
@@ -44,6 +49,7 @@ export interface ConventionsConfig {
 		naming?: NamingPolicyConfig;
 		documentation?: DocumentationPolicyConfig;
 		size?: SizePolicyConfig;
+		dependencies?: DependenciesPolicyConfig;
 	};
 }
 

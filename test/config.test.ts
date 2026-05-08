@@ -112,6 +112,38 @@ describe("config loading", () => {
 		}
 	});
 
+	it("loads optional dependency policies without requiring other policies", async () => {
+		const repo = await createTempDir("pcg-dependencies-config-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					dependencies: {
+						mode: "block",
+						rules: [
+							{
+								from: ["src/**/*.ts"],
+								exclude: ["src/extract/**"],
+								to: ["src/extract/verticals/**"],
+							},
+						],
+					},
+				},
+			});
+			const { hasActivePolicies, loadState } = await import(
+				"../src/core/config.ts"
+			);
+			const state = await loadState(repo);
+
+			expect(state.config?.policies.dependencies?.mode).toBe("block");
+			expect(state.config?.policies.dependencies?.rules[0].from).toEqual([
+				"src/**/*.ts",
+			]);
+			expect(hasActivePolicies(state.config!)).toBe(true);
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
 	it("does not inherit global fallback when project config omits extendsGlobal", async () => {
 		const home = await createTempDir("pcg-home-no-extend-");
 		const repo = await createTempDir("pcg-repo-no-extend-");
@@ -196,6 +228,10 @@ describe("config loading", () => {
 						mode: "block",
 						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
 					},
+					dependencies: {
+						mode: "block",
+						rules: [{ from: ["src/**/*.ts"], to: ["src/internal/**"] }],
+					},
 				},
 			});
 			await writeJson(repo, ".pi/conventions.json", {
@@ -209,6 +245,10 @@ describe("config loading", () => {
 					size: {
 						mode: "warn",
 						limits: [{ prefixes: ["app/"], extensions: ["ts"], maxLines: 50 }],
+					},
+					dependencies: {
+						mode: "warn",
+						rules: [{ from: ["app/**/*.ts"], to: ["app/legacy/**"] }],
 					},
 				},
 			});
@@ -228,6 +268,14 @@ describe("config loading", () => {
 			expect(state.config?.policies.size?.limits[0].onCreate).toBe("block");
 			expect(state.config?.policies.size?.limits[1].maxLines).toBe(50);
 			expect(state.config?.policies.size?.limits[1].onCreate).toBe("warn");
+			expect(state.config?.policies.dependencies?.mode).toBe("warn");
+			expect(state.config?.policies.dependencies?.rules).toHaveLength(2);
+			expect(state.config?.policies.dependencies?.rules[0].onCreate).toBe(
+				"block",
+			);
+			expect(state.config?.policies.dependencies?.rules[1].onCreate).toBe(
+				"warn",
+			);
 			expect(state.config?.sourcePaths).toEqual([
 				path.join(repo, ".pi", "conventions.json"),
 				path.join(home, ".pi", "agent", "conventions.json"),

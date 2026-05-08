@@ -1,12 +1,11 @@
+/**
+ * @fileoverview Runtime extension entrypoint for loading conventions, injecting guardrail prompts, and intercepting file mutations.
+ */
 import path from "node:path";
 import {
 	type ExtensionAPI,
 	isToolCallEventType,
 } from "@mariozechner/pi-coding-agent";
-import { buildDocumentationPromptLines } from "../policies/documentation.ts";
-import { buildNamingPromptLines } from "../policies/naming.ts";
-import { buildSizePromptLines } from "../policies/size.ts";
-import { buildStructurePromptLines } from "../policies/structure.ts";
 import { hasActivePolicies, loadState } from "./config.ts";
 import { derivePostMutationContent } from "./content.ts";
 import {
@@ -283,48 +282,125 @@ async function notifyCommandResult(
 }
 
 function buildSystemPrompt(config: ConventionsConfig): string {
-	const lines = ["## Project Conventions Guardrails"];
+	const lines = ["## Conventions"];
 
 	if (config.policies.structure) {
+		const policy = config.policies.structure;
 		lines.push(
-			"",
-			"Structure policy:",
-			...buildStructurePromptLines(config.policies.structure),
+			`Structure policy: create ${policy.mode}; edit ${policy.editMode}; forbid segments ${policy.forbiddenSegments.join(", ")}.`,
 		);
+		for (const layer of policy.layers) {
+			lines.push(`- zone ${layer.name}: ${layer.prefixes.join(", ")}`);
+		}
+		for (const zone of policy.legacyZones) {
+			lines.push(
+				`- legacy ${zone.prefixes.join(", ")}: create ${zone.onCreate}; edit ${zone.onEdit}; ${zone.reason}`,
+			);
+		}
+		if (policy.newTopLevelFiles.enabled) {
+			const allowed = [...policy.newTopLevelFiles.allowedFiles];
+			const suffix =
+				allowed.length > 0 ? ` allowed ${allowed.join(", ")};` : "";
+			lines.push(
+				`- new top-level files: ${policy.newTopLevelFiles.mode};${suffix} prefer declared zones.`,
+			);
+		}
 	}
 
 	if (config.policies.naming) {
+		const policy = config.policies.naming;
 		lines.push(
-			"",
-			"Naming policy:",
-			...buildNamingPromptLines(config.policies.naming),
+			`Naming policy: create ${policy.mode}; edit ${policy.editMode}.`,
 		);
+		for (const rule of policy.rules) {
+			const checks = [
+				rule.requireCase ? `case ${rule.requireCase}` : "",
+				rule.forbiddenNames.size > 0
+					? `forbid ${[...rule.forbiddenNames].join(",")}`
+					: "",
+				rule.extensions.length > 0 ? `ext ${rule.extensions.join(",")}` : "",
+			]
+				.filter(Boolean)
+				.join("; ");
+			lines.push(
+				`- ${rule.prefixes.join(",")}: ${rule.pathKinds.join("+")}; ${checks}`,
+			);
+		}
 	}
 
 	if (config.policies.documentation) {
+		const policy = config.policies.documentation;
 		lines.push(
-			"",
-			"Documentation policy:",
-			...buildDocumentationPromptLines(config.policies.documentation),
+			`Documentation policy: create ${policy.mode}; edit ${policy.editMode}.`,
 		);
+		for (const rule of policy.rules) {
+			lines.push(
+				`- ${rule.paths.join(",")}: ${documentationRuleSummary(rule)}`,
+			);
+		}
 	}
 
 	if (config.policies.size) {
-		lines.push(
-			"",
-			"Size policy:",
-			...buildSizePromptLines(config.policies.size),
-		);
+		const policy = config.policies.size;
+		lines.push(`Size policy: create ${policy.mode}; edit ${policy.editMode}.`);
+		for (const limit of policy.limits) {
+			const checks = [
+				limit.maxLines !== undefined ? `maxLines ${limit.maxLines}` : "",
+				limit.maxBytes !== undefined ? `maxBytes ${limit.maxBytes}` : "",
+				limit.extensions.length > 0 ? `ext ${limit.extensions.join(",")}` : "",
+			]
+				.filter(Boolean)
+				.join("; ");
+			const reason = limit.reason ? `; ${limit.reason}` : "";
+			lines.push(
+				`- ${limit.prefixes.join(",")}: ${checks}; create ${limit.onCreate}; edit ${limit.onEdit}${reason}`,
+			);
+		}
 	}
 
-	if (config.notes.length > 0) {
-		lines.push("", "Project notes:");
-		for (const note of config.notes) {
-			lines.push(`- ${note}`);
+	if (config.policies.dependencies) {
+		const policy = config.policies.dependencies;
+		lines.push(
+			`Dependencies policy: create ${policy.mode}; edit ${policy.editMode}.`,
+		);
+		for (const rule of policy.rules) {
+			const exclude =
+				rule.exclude.length > 0 ? ` except ${rule.exclude.join(",")}` : "";
+			const reason = rule.reason ? `; ${rule.reason}` : "";
+			lines.push(
+				`- ${rule.from.join(",")}${exclude} -> no imports to ${rule.to.join(",")}; create ${rule.onCreate}; edit ${rule.onEdit}${reason}`,
+			);
 		}
 	}
 
 	return lines.join("\n");
+}
+
+function documentationRuleSummary(
+	rule: NonNullable<
+		ConventionsConfig["policies"]["documentation"]
+	>["rules"][number],
+): string {
+	if (rule.kind === "requireTsdocOnExports") {
+		return `TSDoc exports ${rule.declarations.join(",")}${rule.requireRemarks ? "; @remarks" : ""}`;
+	}
+	if (rule.kind === "requireFileOverview") {
+		const sections =
+			rule.requiredSections.length > 0
+				? `; sections ${rule.requiredSections.join(",")}`
+				: "";
+		return `@fileoverview${sections}`;
+	}
+	if (rule.kind === "forbidFileHeaders") {
+		return `forbid file headers ${rule.patterns.join(",")}`;
+	}
+	if (rule.kind === "forbidCommentPatterns") {
+		return `forbid comments ${rule.patterns.join(",")}`;
+	}
+	if (rule.kind === "todoFormat") {
+		return `TODO/FIXME ${rule.format}`;
+	}
+	return `rationale comments ${rule.commentKeywords.join(",")}`;
 }
 
 function activePolicySummary(config: ConventionsConfig): string {
@@ -333,6 +409,7 @@ function activePolicySummary(config: ConventionsConfig): string {
 	if (config.policies.naming) policies.push("naming");
 	if (config.policies.documentation) policies.push("documentation");
 	if (config.policies.size) policies.push("size");
+	if (config.policies.dependencies) policies.push("dependencies");
 	return policies.length > 0 ? policies.join(", ") : "no active policies";
 }
 

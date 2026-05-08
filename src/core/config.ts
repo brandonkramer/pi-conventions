@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { normalizeDependenciesPolicy } from "../policies/dependencies.ts";
 import { normalizeDocumentationPolicy } from "../policies/documentation.ts";
 import { normalizeNamingPolicy } from "../policies/naming.ts";
 import { normalizeSizePolicy } from "../policies/size.ts";
@@ -56,7 +57,8 @@ export function hasActivePolicies(config: ConventionsConfig): boolean {
 		config.policies.structure ||
 			config.policies.naming ||
 			config.policies.documentation ||
-			config.policies.size,
+			config.policies.size ||
+			config.policies.dependencies,
 	);
 }
 
@@ -159,6 +161,9 @@ function normalizeConventionsConfig(
 				envelope?.policies?.documentation,
 			),
 			size: normalizeSizePolicy(envelope?.policies?.size),
+			dependencies: normalizeDependenciesPolicy(
+				envelope?.policies?.dependencies,
+			),
 		},
 	};
 }
@@ -191,6 +196,11 @@ function mergeRawConventionsConfig(
 				globalConfig?.policies?.size,
 				projectConfig?.policies?.size,
 				"limits",
+			),
+			dependencies: mergeRulePolicy(
+				globalConfig?.policies?.dependencies,
+				projectConfig?.policies?.dependencies,
+				"rules",
 			),
 		},
 	};
