@@ -1,3 +1,4 @@
+/** @fileoverview Collects policy violations for a given file or path. */
 import {
 	dependenciesPolicyMatchesPath,
 	evaluateDependenciesViolation,
@@ -12,6 +13,7 @@ import {
 	sizePolicyMatchesPath,
 } from "../policies/size.ts";
 import { evaluateStructureViolation } from "../policies/structure.ts";
+import { matchesAnyPathPattern } from "./pattern.ts";
 import type { ConventionsConfig, Violation } from "./types.ts";
 
 const MODE_PRIORITY = {
@@ -30,6 +32,9 @@ export function collectViolations(
 	input: EvaluationInput,
 	config: ConventionsConfig,
 ): Violation[] {
+	if (matchesAnyPathPattern(input.relativePath, config.ignoreMatchers)) {
+		return [];
+	}
 	const violations: Violation[] = [];
 
 	if (config.policies.structure) {

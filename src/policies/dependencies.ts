@@ -12,6 +12,7 @@ import { parseMode, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawDependencyRule {
+	id?: string;
 	from?: unknown[];
 	exclude?: unknown[];
 	to?: unknown[];
@@ -28,6 +29,7 @@ export interface RawDependenciesPolicyConfig {
 }
 
 export interface DependencyRule {
+	id?: string;
 	from: string[];
 	fromMatchers: PathPattern[];
 	exclude: string[];
@@ -103,6 +105,7 @@ export function evaluateDependenciesViolation(
 			}
 			return {
 				policyId: "dependencies",
+				ruleId: rule.id,
 				mode: exists ? rule.onEdit : rule.onCreate,
 				reason:
 					rule.reason ??
@@ -164,6 +167,10 @@ function normalizeRule(
 	const exclude = uniqueStrings(raw.exclude, normalizeRelativePath);
 	const reason = typeof raw.reason === "string" ? raw.reason.trim() : undefined;
 	return {
+		id:
+			typeof raw.id === "string" && raw.id.trim().length > 0
+				? raw.id.trim()
+				: undefined,
 		from,
 		fromMatchers: compilePathPatterns(from),
 		exclude,

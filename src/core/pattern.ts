@@ -1,3 +1,4 @@
+/** @fileoverview Glob pattern compilation and path matching. */
 import { normalizeRelativePath } from "./path.ts";
 
 export interface PathPattern {

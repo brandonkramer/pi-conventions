@@ -487,4 +487,188 @@ describe("naming policy", () => {
 		expect(violation).toMatchObject({ policyId: "naming", mode: "confirm" });
 		expect(violation?.reason).toContain("helpers");
 	});
+
+	it("includes rule id in violation when configured", () => {
+		const config = normalizeNamingPolicy({
+			rules: [
+				{
+					id: "naming.components.pascal",
+					prefixes: ["src/components/"],
+					pathKinds: ["file"],
+					requireCase: "PascalCase",
+				},
+			],
+		});
+
+		const violation = evaluateNamingViolation(
+			"src/components/button.tsx",
+			false,
+			config!,
+		);
+		expect(violation?.ruleId).toBe("naming.components.pascal");
+	});
+
+	it("respects per-rule exclude patterns", () => {
+		const config = normalizeNamingPolicy({
+			rules: [
+				{
+					prefixes: ["src/"],
+					pathKinds: ["file"],
+					requireCase: "kebab-case",
+					exclude: ["src/components/**"],
+				},
+			],
+		});
+
+		expect(
+			evaluateNamingViolation("src/utils/myHelper.ts", false, config!),
+		).toBeDefined();
+		expect(
+			evaluateNamingViolation("src/components/Button.tsx", false, config!),
+		).toBeUndefined();
+	});
+});
+
+describe("size policy rule ids and excludes", () => {
+	it("includes rule id in violation when configured", () => {
+		const config = normalizeSizePolicy({
+			limits: [
+				{
+					id: "size.core.500",
+					prefixes: ["src/core/"],
+					maxLines: 2,
+				},
+			],
+		});
+
+		const violation = evaluateSizeViolation(
+			"src/core/runtime.ts",
+			false,
+			"line1\nline2\nline3\n",
+			config!,
+		);
+		expect(violation?.ruleId).toBe("size.core.500");
+	});
+
+	it("respects per-limit exclude patterns", () => {
+		const config = normalizeSizePolicy({
+			limits: [
+				{
+					prefixes: ["src/"],
+					maxLines: 2,
+					exclude: ["src/**/*.generated.ts"],
+				},
+			],
+		});
+
+		expect(
+			evaluateSizeViolation("src/core/mod.ts", false, "a\nb\nc\n", config!),
+		).toBeDefined();
+		expect(
+			evaluateSizeViolation(
+				"src/core/mod.generated.ts",
+				false,
+				"a\nb\nc\n",
+				config!,
+			),
+		).toBeUndefined();
+	});
+});
+
+describe("documentation policy rule ids and excludes", () => {
+	it("includes rule id in violation when configured", () => {
+		const config = normalizeDocumentationPolicy({
+			rules: [
+				{
+					id: "docs.file-overview",
+					kind: "requireFileOverview",
+					paths: ["src/**/*.ts"],
+				},
+			],
+		});
+
+		const violation = evaluateDocumentationViolation(
+			"src/core/client.ts",
+			false,
+			"export {};\n",
+			config!,
+		);
+		expect(violation?.ruleId).toBe("docs.file-overview");
+	});
+
+	it("respects per-rule exclude patterns", () => {
+		const config = normalizeDocumentationPolicy({
+			rules: [
+				{
+					kind: "requireFileOverview",
+					paths: ["src/**/*.ts"],
+					exclude: ["src/**/*.d.ts"],
+				},
+			],
+		});
+
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.ts",
+				false,
+				"export {};\n",
+				config!,
+			),
+		).toBeDefined();
+		expect(
+			evaluateDocumentationViolation(
+				"src/core/client.d.ts",
+				false,
+				"export {};\n",
+				config!,
+			),
+		).toBeUndefined();
+	});
+});
+
+describe("dependencies policy rule ids", () => {
+	it("includes rule id in violation when configured", () => {
+		const config = normalizeDependenciesPolicy({
+			rules: [
+				{
+					id: "no-deep-extract",
+					from: ["src/**/*.ts"],
+					to: ["src/extract/verticals/**"],
+				},
+			],
+		});
+
+		const violation = evaluateDependenciesViolation(
+			"src/features/reddit.ts",
+			false,
+			"import { reddit } from '../extract/verticals/reddit.js';\n",
+			config!,
+		);
+		expect(violation?.ruleId).toBe("no-deep-extract");
+	});
+});
+
+describe("structure policy rule ids", () => {
+	it("includes legacy zone rule id in violation when configured", () => {
+		const config = normalizeStructurePolicy({
+			mode: "warn",
+			sourceRoots: ["src/"],
+			legacyZones: [
+				{
+					id: "legacy.monolith",
+					prefixes: ["src/legacy/"],
+					reason: "Do not add new files to the legacy monolith.",
+					onCreate: "block",
+				},
+			],
+			newTopLevelFiles: { enabled: false },
+		});
+
+		const violation = evaluateStructureViolation(
+			"src/legacy/module.ts",
+			false,
+			config!,
+		);
+		expect(violation?.ruleId).toBe("legacy.monolith");
+	});
 });

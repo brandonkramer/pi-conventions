@@ -79,6 +79,8 @@ Diagnostics commands:
 - `/conventions check <path>` evaluates one existing file or proposed path and reports matching policy findings.
 - `/conventions audit` runs a read-only repo scan of active policies. In Git repositories it audits Git-visible files using Git's standard ignore rules (`.gitignore`, `.git/info/exclude`, and global excludes). Outside Git repositories it falls back to a conservative built-in ignore list for common generated/dependency outputs such as `.git/`, `node_modules/`, `dist/`, and `coverage/`.
 - `/conventions audit --include-ignored` bypasses Git file discovery and uses the fallback walker.
+- `/conventions audit --json` and `/conventions check <path> --json` emit machine-readable findings for agents, CI, and pre-commit hooks.
+- `/conventions audit --policy <name>` and `/conventions check <path> --policy <name>` filter to a single policy family (`structure`, `naming`, `documentation`, `size`, `dependencies`). Composes with `--json`.
 
 ## Config shape
 
@@ -86,6 +88,7 @@ Diagnostics commands:
 {
   "$schema": "./conventions.schema.json",
   "extendsGlobal": true,
+  "ignorePaths": ["vendor/**", "**/*.generated.ts"],
   "notes": ["Keep code organized by responsibility."],
   "policies": {
     "structure": {
@@ -98,6 +101,7 @@ Diagnostics commands:
       "mode": "warn",
       "rules": [
         {
+          "id": "naming.rs.modules",
           "prefixes": ["src/"],
           "pathKinds": ["file"],
           "requireCase": "snake_case",
@@ -111,9 +115,11 @@ Diagnostics commands:
       "mode": "warn",
       "limits": [
         {
+          "id": "size.core.500",
           "prefixes": ["src/"],
           "extensions": ["ts", "tsx", "rs", "go"],
           "maxLines": 500,
+          "exclude": ["src/**/*.generated.ts"],
           "reason": "Split large files by responsibility."
         }
       ]
@@ -139,8 +145,10 @@ Diagnostics commands:
           "requireRemarks": false
         },
         {
+          "id": "docs.file-overview",
           "kind": "requireFileOverview",
           "paths": ["src/**/*.ts"],
+          "exclude": ["src/**/*.d.ts"],
           "requiredTags": ["@fileoverview"],
           "requiredSections": ["Design:"],
           "optionalSections": ["Performance:"]
@@ -152,7 +160,7 @@ Diagnostics commands:
           "format": "TAG: concrete action - referent"
         }
       ]
-    },
+    }
   }
 }
 ```
@@ -173,14 +181,20 @@ What it enforces:
 - architecture-zone guidance in the system prompt
 - write/edit interception for file-placement violations
 
+### Top-level `ignorePaths`
+
+Add `ignorePaths` at the top level of the config to suppress findings for matching paths across all policies. Patterns support glob syntax (`**`, `*`, `{a,b}`). Ignored paths are skipped in write/edit evaluation, `/conventions check`, and `/conventions audit`.
+
 ### Naming policy
 
 - require case styles like `kebab-case`, `snake_case`, `camelCase`, or `PascalCase`
 - forbid generic file or directory names like `index`, `helpers`, or `shared` under selected prefixes
 - scope rules to selected extensions and path kinds
+- optional stable `id` for each rule, shown in diagnostics as `naming:your-id`
+- optional per-rule `exclude` to suppress the rule for matching paths without disabling the whole policy
 - warn, confirm, or block on create/edit
 
-### Dependencies policy 
+### Dependencies policy
 
 Dependency checks are additive and disabled unless `policies.dependencies` is present. They inspect post-mutation file content for `write` and `edit` calls, run during audits when matching files are scanned, and default to `warn`.
 
@@ -190,10 +204,11 @@ Supported deterministic rule fields:
 - `exclude` — source path patterns exempt from the rule
 - `to` — resolved repo-relative target path patterns that are forbidden
 - `reason` — project-specific explanation shown in guard output
+- optional stable `id`, shown in diagnostics as `dependencies:your-id`
 
 The policy only scans static `import` / `export ... from` specifiers and relative dynamic imports like `import("../x.js")`. Relative specifiers are normalized to repo-relative paths before matching. It intentionally does not perform TypeScript compiler resolution, path alias resolution, package export-map resolution, call graph analysis, circular dependency detection, or framework-specific module semantics.
 
-### Size policy 
+### Size policy
 
 Size checks are additive and disabled unless `policies.size` is present. They inspect file content when available and default to `warn`.
 
@@ -203,6 +218,8 @@ Supported deterministic limits:
 - `maxBytes` — warn/confirm/block when matching files exceed a configured UTF-8 byte count
 - `extensions` — scope a limit to selected file extensions, including `d.ts`
 - `ignoreBlankLines` and `ignoreCommentLines` — optionally count only substantive lines
+- optional stable `id` for each limit, shown in diagnostics as `size:your-id`
+- optional per-limit `exclude` to suppress the limit for matching paths
 
 Use size policy to catch files that should be split by responsibility before they become hard to review. See `examples/conventions.size.json` for a focused starting point.
 
@@ -220,6 +237,8 @@ Supported deterministic rules:
 - `forbidCommentPatterns` — flag configured comment patterns, such as ticket or PR references, anywhere in matching files
 - `todoFormat` — require `TODO: description` / `FIXME: description`, or stricter `TODO: concrete action - referent`, comments with configured tags
 - `requireRationaleComments` — warn when sensitive matching files do not contain enough comments with configured rationale keywords
+- optional stable `id` for each rule, shown in diagnostics as `documentation:your-id`
+- optional per-rule `exclude` to suppress the rule for matching paths
 
 Scope documentation rules narrowly and exclude generated, vendored, or unusually large files when possible. Content checks are deterministic and intentionally simple, so matching very large files can add linear scan cost to write/edit hooks.
 

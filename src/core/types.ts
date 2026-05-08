@@ -1,3 +1,4 @@
+/** @fileoverview Shared TypeScript types and interfaces. */
 import type {
 	DependenciesPolicyConfig,
 	RawDependenciesPolicyConfig,
@@ -23,12 +24,14 @@ export type EnforcementMode = "warn" | "confirm" | "block";
 
 export interface Violation {
 	policyId: string;
+	ruleId?: string;
 	mode: EnforcementMode;
 	reason: string;
 }
 
 export interface RawConventionsConfig {
 	extendsGlobal?: unknown;
+	ignorePaths?: unknown[];
 	notes?: unknown[];
 	policies?: {
 		structure?: RawStructurePolicyConfig;
@@ -43,6 +46,8 @@ export interface ConventionsConfig {
 	path: string;
 	sourcePaths?: string[];
 	extendsGlobal?: boolean;
+	ignorePaths: string[];
+	ignoreMatchers: import("./pattern.ts").PathPattern[];
 	notes: string[];
 	policies: {
 		structure?: StructurePolicyConfig;

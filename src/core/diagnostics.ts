@@ -1,3 +1,4 @@
+/** @fileoverview Check and audit diagnostics output for conventions. */
 import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,6 +8,7 @@ import {
 	needsContentForPath,
 	strongestViolation,
 } from "./evaluate.ts";
+import { matchesAnyPathPattern } from "./pattern.ts";
 import { normalizeRelativePath, pathExists } from "./path.ts";
 import type { ConventionsConfig, Violation } from "./types.ts";
 
@@ -25,23 +27,52 @@ const IGNORED_DIRS = new Set([
 const IGNORED_EXTENSIONS = [".tgz"];
 const execFileAsync = promisify(execFile);
 
+export const KNOWN_POLICY_IDS = [
+	"structure",
+	"naming",
+	"documentation",
+	"size",
+	"dependencies",
+] as const;
+export type KnownPolicyId = (typeof KNOWN_POLICY_IDS)[number];
+
 export interface AuditConventionsOptions {
 	includeIgnored?: boolean;
+	json?: boolean;
+	policy?: string;
+}
+
+export interface CheckConventionsOptions {
+	json?: boolean;
+	policy?: string;
 }
 
 export async function checkConventionsPath(
 	cwd: string,
 	config: ConventionsConfig,
 	rawPath: string,
+	options: CheckConventionsOptions = {},
 ): Promise<string> {
 	const relativePath = normalizeRelativePath(rawPath);
 	const absolutePath = path.resolve(cwd, relativePath);
 	const exists = await pathExists(absolutePath);
 	const content = await readContentIfNeeded(cwd, relativePath, exists, config);
-	const violations = collectViolations(
-		{ relativePath, exists, content },
-		config,
+	const violations = filterViolations(
+		collectViolations({ relativePath, exists, content }, config),
+		options.policy,
 	);
+	if (options.json) {
+		return JSON.stringify(
+			{
+				path: relativePath,
+				exists,
+				contentEvaluated: content !== undefined,
+				findings: violations.map((v) => violationToJson(relativePath, v)),
+			},
+			null,
+			2,
+		);
+	}
 	return formatCheck(relativePath, exists, content !== undefined, violations);
 }
 
@@ -50,7 +81,7 @@ export async function auditConventions(
 	config: ConventionsConfig,
 	options: AuditConventionsOptions = {},
 ): Promise<string> {
-	const files = await listAuditFiles(cwd, options);
+	const files = await listAuditFiles(cwd, config, options);
 	const findings: DiagnosticFinding[] = [];
 
 	for (const relativePath of files) {
@@ -62,11 +93,43 @@ export async function auditConventions(
 			{ relativePath, exists: true, content },
 			config,
 		)) {
+			if (options.policy && violation.policyId !== options.policy) continue;
 			findings.push({ relativePath, violation });
 		}
 	}
 
+	if (options.json) {
+		return JSON.stringify(
+			{
+				findings: findings.map((f) =>
+					violationToJson(f.relativePath, f.violation),
+				),
+			},
+			null,
+			2,
+		);
+	}
 	return formatAudit(findings);
+}
+
+function filterViolations(
+	violations: Violation[],
+	policy: string | undefined,
+): Violation[] {
+	return policy ? violations.filter((v) => v.policyId === policy) : violations;
+}
+
+function violationToJson(
+	relativePath: string,
+	violation: Violation,
+): Record<string, unknown> {
+	return {
+		path: relativePath,
+		policyId: violation.policyId,
+		ruleId: violation.ruleId,
+		mode: violation.mode,
+		reason: violation.reason,
+	};
 }
 
 async function readContentIfNeeded(
@@ -87,8 +150,10 @@ async function readContentIfNeeded(
 
 async function listAuditFiles(
 	cwd: string,
+	config: ConventionsConfig,
 	options: AuditConventionsOptions,
 ): Promise<string[]> {
+	let files: string[];
 	if (!options.includeIgnored) {
 		try {
 			const { stdout } = await execFileAsync(
@@ -96,19 +161,22 @@ async function listAuditFiles(
 				["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
 				{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
 			);
-			return [
+			files = [
 				...new Set(
 					stdout.split("\0").filter(Boolean).map(normalizeRelativePath),
 				),
-			].sort();
+			];
 		} catch {
-			// fall through to filesystem walk
+			files = [];
+			await walk(cwd, "", files);
 		}
+	} else {
+		files = [];
+		await walk(cwd, "", files);
 	}
-
-	const result: string[] = [];
-	await walk(cwd, "", result);
-	return result.sort();
+	return files
+		.filter((f) => !matchesAnyPathPattern(f, config.ignoreMatchers))
+		.sort();
 }
 
 async function walk(
@@ -161,9 +229,10 @@ function formatCheck(
 		"",
 	];
 	for (const violation of violations) {
-		lines.push(
-			`- ${violation.mode} ${violation.policyId}: ${violation.reason}`,
-		);
+		const id = violation.ruleId
+			? `${violation.policyId}:${violation.ruleId}`
+			: violation.policyId;
+		lines.push(`- ${violation.mode} ${id}: ${violation.reason}`);
 	}
 	return lines.join("\n");
 }
@@ -182,8 +251,11 @@ function formatAudit(findings: DiagnosticFinding[]): string {
 		for (const finding of findings.filter(
 			(item) => item.violation.policyId === policyId,
 		)) {
+			const id = finding.violation.ruleId
+				? `${finding.violation.policyId}:${finding.violation.ruleId}`
+				: finding.violation.policyId;
 			lines.push(
-				`- ${finding.violation.mode} ${finding.relativePath}: ${finding.violation.reason}`,
+				`- ${finding.violation.mode} ${finding.relativePath}: ${id} — ${finding.violation.reason}`,
 			);
 		}
 	}

@@ -1,3 +1,4 @@
+/** @fileoverview Config loading, merging, and normalization for conventions. */
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { normalizeDocumentationPolicy } from "../policies/documentation.ts";
 import { normalizeNamingPolicy } from "../policies/naming.ts";
 import { normalizeSizePolicy } from "../policies/size.ts";
 import { normalizeStructurePolicy } from "../policies/structure.ts";
+import { compilePathPatterns } from "./pattern.ts";
 import { pathExists } from "./path.ts";
 import { uniqueStrings } from "./strings.ts";
 import type {
@@ -149,10 +151,13 @@ function normalizeConventionsConfig(
 	sourcePaths: string[],
 ): ConventionsConfig {
 	const envelope = asConventionsConfig(raw);
+	const ignorePaths = uniqueStrings(envelope?.ignorePaths, (value) => value);
 	return {
 		path: configPath,
 		sourcePaths,
 		extendsGlobal: envelope?.extendsGlobal === true,
+		ignorePaths,
+		ignoreMatchers: compilePathPatterns(ignorePaths),
 		notes: uniqueStrings(envelope?.notes, (value) => value),
 		policies: {
 			structure: normalizeStructurePolicy(envelope?.policies?.structure),
@@ -176,6 +181,10 @@ function mergeRawConventionsConfig(
 	const projectConfig = asConventionsConfig(projectRaw);
 	return {
 		extendsGlobal: projectConfig?.extendsGlobal,
+		ignorePaths: concatArrays(
+			globalConfig?.ignorePaths,
+			projectConfig?.ignorePaths,
+		),
 		notes: concatArrays(globalConfig?.notes, projectConfig?.notes),
 		policies: {
 			structure: mergeStructurePolicy(

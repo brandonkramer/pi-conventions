@@ -1,3 +1,4 @@
+/** @fileoverview Documentation policy normalization and evaluation. */
 import { normalizeRelativePath } from "../core/path.ts";
 import {
 	compilePathPatterns,
@@ -63,6 +64,8 @@ const DECLARATION_BITS: Record<DocumentationDeclarationKind, number> = {
 };
 
 export interface RawDocumentationRule {
+	id?: string;
+	exclude?: unknown[];
 	kind?: unknown;
 	paths?: unknown[];
 	pathPattern?: unknown[];
@@ -88,6 +91,9 @@ export interface RawDocumentationPolicyConfig {
 }
 
 interface BaseDocumentationRule {
+	id?: string;
+	exclude: string[];
+	excludeMatchers: PathPattern[];
 	kind: DocumentationRuleKind;
 	paths: string[];
 	pathMatchers: PathPattern[];
@@ -203,6 +209,7 @@ export function evaluateDocumentationViolation(
 ): Violation | undefined {
 	for (const rule of config.rules) {
 		if (!matchesAnyPathPattern(relativePath, rule.pathMatchers)) continue;
+		if (matchesAnyPathPattern(relativePath, rule.excludeMatchers)) continue;
 
 		const reason =
 			rule.kind === "requireTsdocOnExports"
@@ -219,6 +226,7 @@ export function evaluateDocumentationViolation(
 		if (reason) {
 			return {
 				policyId: "documentation",
+				ruleId: rule.id,
 				mode: exists ? config.editMode : config.mode,
 				reason,
 			};
@@ -302,6 +310,12 @@ function normalizeRule(
 	);
 	const pathMatchers = compilePathPatterns(paths);
 	if (!kind || paths.length === 0) return undefined;
+	const id =
+		typeof rule.id === "string" && rule.id.trim().length > 0
+			? rule.id.trim()
+			: undefined;
+	const exclude = uniqueStrings(rule.exclude, (value) => value);
+	const excludeMatchers = compilePathPatterns(exclude);
 
 	if (kind === "requireTsdocOnExports") {
 		const declarations = uniqueStrings(rule.declarations, (value) =>
@@ -312,6 +326,9 @@ function normalizeRule(
 			DEFAULT_DECLARATIONS.includes(value as DocumentationDeclarationKind),
 		);
 		return {
+			id,
+			exclude,
+			excludeMatchers,
 			kind,
 			paths,
 			pathMatchers,
@@ -331,6 +348,9 @@ function normalizeRule(
 			(value) => value,
 		).filter((value) => value.startsWith("@"));
 		return {
+			id,
+			exclude,
+			excludeMatchers,
 			kind,
 			paths,
 			pathMatchers,
@@ -354,7 +374,7 @@ function normalizeRule(
 			value.toLowerCase(),
 		);
 		return patterns.length > 0
-			? { kind, paths, pathMatchers, patterns }
+			? { id, exclude, excludeMatchers, kind, paths, pathMatchers, patterns }
 			: undefined;
 	}
 
@@ -363,6 +383,9 @@ function normalizeRule(
 			value.toUpperCase(),
 		);
 		return {
+			id,
+			exclude,
+			excludeMatchers,
 			kind,
 			paths,
 			pathMatchers,
@@ -379,6 +402,9 @@ function normalizeRule(
 	);
 	if (commentKeywords.length === 0) return undefined;
 	return {
+		id,
+		exclude,
+		excludeMatchers,
 		kind,
 		paths,
 		pathMatchers,

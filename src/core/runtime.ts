@@ -14,7 +14,11 @@ import {
 	parseCreateTargetAlias,
 	scaffoldConventions,
 } from "./create.ts";
-import { auditConventions, checkConventionsPath } from "./diagnostics.ts";
+import {
+	auditConventions,
+	checkConventionsPath,
+	KNOWN_POLICY_IDS,
+} from "./diagnostics.ts";
 import {
 	collectViolations,
 	needsContentForPath,
@@ -229,8 +233,29 @@ async function handleCheck(
 	cwd: string,
 	state: LoadState,
 ): Promise<{ message: string; level: "info" | "warning" | "error" }> {
-	if (!rawTarget) {
-		return { message: "Usage: /conventions check <path>", level: "warning" };
+	const tokens = rawTarget.split(/\s+/).filter(Boolean);
+	const json = tokens.includes("--json");
+	let policy: string | undefined;
+	const positional: string[] = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (token === "--json") continue;
+		if (token === "--policy") {
+			policy = tokens[++i];
+			continue;
+		}
+		if (token.startsWith("--policy=")) {
+			policy = token.slice("--policy=".length);
+			continue;
+		}
+		positional.push(token);
+	}
+	const target = positional[0];
+	if (!target) {
+		return {
+			message: "Usage: /conventions check <path> [--json] [--policy <name>]",
+			level: "warning",
+		};
 	}
 	if (state.error) return { message: state.error, level: "error" };
 	if (!state.config || !hasActivePolicies(state.config)) {
@@ -239,8 +264,17 @@ async function handleCheck(
 			level: "warning",
 		};
 	}
+	if (policy && !KNOWN_POLICY_IDS.includes(policy as any)) {
+		return {
+			message: `Unknown policy '${policy}'. Known: ${KNOWN_POLICY_IDS.join(", ")}.`,
+			level: "warning",
+		};
+	}
 	return {
-		message: await checkConventionsPath(cwd, state.config, rawTarget),
+		message: await checkConventionsPath(cwd, state.config, target, {
+			json,
+			policy,
+		}),
 		level: "info",
 	};
 }
@@ -257,17 +291,43 @@ async function handleAudit(
 			level: "warning",
 		};
 	}
-	const args = rawTarget.split(/\s+/).filter(Boolean);
-	const includeIgnored = args.includes("--include-ignored");
-	const unknownArg = args.find((arg) => arg !== "--include-ignored");
-	if (unknownArg) {
+	const tokens = rawTarget.split(/\s+/).filter(Boolean);
+	const includeIgnored = tokens.includes("--include-ignored");
+	const json = tokens.includes("--json");
+	let policy: string | undefined;
+	const unknown: string[] = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (token === "--include-ignored" || token === "--json") continue;
+		if (token === "--policy") {
+			policy = tokens[++i];
+			continue;
+		}
+		if (token.startsWith("--policy=")) {
+			policy = token.slice("--policy=".length);
+			continue;
+		}
+		unknown.push(token);
+	}
+	if (unknown.length > 0) {
 		return {
-			message: "Usage: /conventions audit [--include-ignored]",
+			message:
+				"Usage: /conventions audit [--include-ignored] [--json] [--policy <name>]",
+			level: "warning",
+		};
+	}
+	if (policy && !KNOWN_POLICY_IDS.includes(policy as any)) {
+		return {
+			message: `Unknown policy '${policy}'. Known: ${KNOWN_POLICY_IDS.join(", ")}.`,
 			level: "warning",
 		};
 	}
 	return {
-		message: await auditConventions(cwd, state.config, { includeIgnored }),
+		message: await auditConventions(cwd, state.config, {
+			includeIgnored,
+			json,
+			policy,
+		}),
 		level: "info",
 	};
 }

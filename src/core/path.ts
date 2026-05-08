@@ -1,3 +1,4 @@
+/** @fileoverview Path normalization and filesystem helpers. */
 import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 

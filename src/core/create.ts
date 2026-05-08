@@ -1,3 +1,4 @@
+/** @fileoverview Scaffolds conventions.json and schema files for projects. */
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";

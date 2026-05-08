@@ -128,6 +128,8 @@ describe("runtime documentation policy", () => {
 		expect(
 			needsContentForPath("src/other.ts", {
 				path: ".pi/conventions.json",
+				ignorePaths: [],
+				ignoreMatchers: [],
 				notes: [],
 				policies: { documentation },
 			}),
@@ -135,6 +137,8 @@ describe("runtime documentation policy", () => {
 		expect(
 			needsContentForPath("docs/notes.ts", {
 				path: ".pi/conventions.json",
+				ignorePaths: [],
+				ignoreMatchers: [],
 				notes: [],
 				policies: { documentation },
 			}),
@@ -198,6 +202,8 @@ describe("runtime dependencies policy", () => {
 		expect(
 			needsContentForPath("src/extract/registry.ts", {
 				path: ".pi/conventions.json",
+				ignorePaths: [],
+				ignoreMatchers: [],
 				notes: [],
 				policies: { dependencies },
 			}),
@@ -205,6 +211,8 @@ describe("runtime dependencies policy", () => {
 		expect(
 			needsContentForPath("src/features/reddit.ts", {
 				path: ".pi/conventions.json",
+				ignorePaths: [],
+				ignoreMatchers: [],
 				notes: [],
 				policies: { dependencies },
 			}),
@@ -448,6 +456,282 @@ describe("runtime size policy", () => {
 
 			expect(result).toMatchObject({ block: true });
 			expect(result.reason).toContain("maxLines");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+});
+
+describe("runtime ignorePaths", () => {
+	it("skips ignored paths during tool_call evaluation", async () => {
+		const repo = await createTempDir("pcg-runtime-ignore-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				ignorePaths: ["vendor/**", "**/*.generated.ts"],
+				policies: {
+					size: {
+						mode: "block",
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			const { handlers } = createHarness();
+
+			const ignored = await handlers.get("tool_call")!(
+				{
+					toolName: "write",
+					toolCallId: "call-1",
+					input: { path: "vendor/lib.ts", content: "one\ntwo\n" },
+				},
+				{ cwd: repo, hasUI: false, ui: { notify: () => undefined } },
+			);
+			expect(ignored).toBeUndefined();
+
+			const ignoredGlob = await handlers.get("tool_call")!(
+				{
+					toolName: "write",
+					toolCallId: "call-2",
+					input: { path: "src/types.generated.ts", content: "one\ntwo\n" },
+				},
+				{ cwd: repo, hasUI: false, ui: { notify: () => undefined } },
+			);
+			expect(ignoredGlob).toBeUndefined();
+
+			const notIgnored = await handlers.get("tool_call")!(
+				{
+					toolName: "write",
+					toolCallId: "call-3",
+					input: { path: "src/types.ts", content: "one\ntwo\n" },
+				},
+				{ cwd: repo, hasUI: false, ui: { notify: () => undefined } },
+			);
+			expect(notIgnored).toMatchObject({ block: true });
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("skips ignored paths in audit output", async () => {
+		const repo = await createTempDir("pcg-runtime-ignore-audit-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				ignorePaths: ["vendor/**"],
+				policies: {
+					size: {
+						limits: [
+							{
+								prefixes: ["src/", "vendor/"],
+								extensions: ["ts"],
+								maxLines: 1,
+							},
+						],
+					},
+				},
+			});
+			await writeText(repo, "src/file.ts", "one\ntwo\n");
+			await writeText(repo, "vendor/lib.ts", "one\ntwo\n");
+			await runGit(repo, ["init", "--quiet"]);
+			await runGit(repo, ["add", "-A"]);
+
+			const { commands } = createHarness();
+			const messages: string[] = [];
+			const ctx = {
+				cwd: repo,
+				hasUI: true,
+				ui: {
+					setStatus: () => undefined,
+					notify: (message: string) => messages.push(message),
+				},
+			};
+			await commands.get("conventions").handler("audit", ctx);
+			const auditMessage = messages[messages.length - 1] ?? "";
+
+			expect(auditMessage).toContain("src/file.ts");
+			expect(auditMessage).not.toContain("vendor/lib.ts");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+});
+
+describe("runtime rule ids in diagnostics", () => {
+	it("includes rule ids in check output when configured", async () => {
+		const repo = await createTempDir("pcg-runtime-rule-id-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					naming: {
+						rules: [
+							{
+								id: "naming.components.pascal",
+								prefixes: ["src/components/"],
+								pathKinds: ["file"],
+								requireCase: "PascalCase",
+							},
+						],
+					},
+				},
+			});
+			const { commands } = createHarness();
+			const messages: string[] = [];
+			const ctx = {
+				cwd: repo,
+				hasUI: true,
+				ui: {
+					setStatus: () => undefined,
+					notify: (message: string) => messages.push(message),
+				},
+			};
+			await commands
+				.get("conventions")
+				.handler("check src/components/button.tsx", ctx);
+			const checkMessage = messages[messages.length - 1] ?? "";
+
+			expect(checkMessage).toContain("naming:naming.components.pascal");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+});
+
+describe("runtime audit JSON and policy filter", () => {
+	async function runConventions(repo: string, args: string): Promise<string> {
+		const { commands } = createHarness();
+		const messages: string[] = [];
+		const ctx = {
+			cwd: repo,
+			hasUI: true,
+			ui: {
+				setStatus: () => undefined,
+				notify: (message: string) => messages.push(message),
+			},
+		};
+		await commands.get("conventions").handler(args, ctx);
+		return messages[messages.length - 1] ?? "";
+	}
+
+	it("emits stable JSON for audit --json", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-json-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [
+							{
+								id: "size.cap",
+								prefixes: ["src/"],
+								extensions: ["ts"],
+								maxLines: 1,
+							},
+						],
+					},
+				},
+			});
+			await writeText(repo, "src/file.ts", "one\ntwo\n");
+			await runGit(repo, ["init", "--quiet"]);
+			await runGit(repo, ["add", "-A"]);
+
+			const output = await runConventions(repo, "audit --json");
+			const parsed = JSON.parse(output);
+			expect(parsed.findings).toHaveLength(1);
+			expect(parsed.findings[0]).toMatchObject({
+				path: "src/file.ts",
+				policyId: "size",
+				ruleId: "size.cap",
+				mode: "warn",
+			});
+			expect(typeof parsed.findings[0].reason).toBe("string");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("filters audit by --policy name", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-policy-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+					documentation: {
+						rules: [
+							{
+								kind: "requireFileOverview",
+								paths: ["src/**"],
+							},
+						],
+					},
+				},
+			});
+			await writeText(repo, "src/file.ts", "one\ntwo\n");
+			await runGit(repo, ["init", "--quiet"]);
+			await runGit(repo, ["add", "-A"]);
+
+			const sizeOnly = await runConventions(repo, "audit --policy size");
+			expect(sizeOnly).toContain("Size");
+			expect(sizeOnly).not.toContain("Documentation");
+
+			const docsJson = await runConventions(
+				repo,
+				"audit --json --policy documentation",
+			);
+			const parsed = JSON.parse(docsJson);
+			expect(parsed.findings.length).toBeGreaterThan(0);
+			for (const finding of parsed.findings) {
+				expect(finding.policyId).toBe("documentation");
+			}
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("reports usage on unknown policy filter", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-bad-policy-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+
+			const output = await runConventions(repo, "audit --policy bogus");
+			expect(output).toContain("Unknown policy 'bogus'");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("emits JSON for check --json", async () => {
+		const repo = await createTempDir("pcg-runtime-check-json-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					naming: {
+						rules: [
+							{
+								id: "naming.components.pascal",
+								prefixes: ["src/components/"],
+								pathKinds: ["file"],
+								requireCase: "PascalCase",
+							},
+						],
+					},
+				},
+			});
+			const output = await runConventions(
+				repo,
+				"check src/components/button.tsx --json",
+			);
+			const parsed = JSON.parse(output);
+			expect(parsed.path).toBe("src/components/button.tsx");
+			expect(parsed.findings).toHaveLength(1);
+			expect(parsed.findings[0]).toMatchObject({
+				policyId: "naming",
+				ruleId: "naming.components.pascal",
+			});
 		} finally {
 			await removeTempDir(repo);
 		}

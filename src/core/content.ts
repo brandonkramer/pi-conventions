@@ -1,3 +1,4 @@
+/** @fileoverview Derives post-mutation file content from tool inputs. */
 import { readFile } from "node:fs/promises";
 
 export interface MutationContentInput {

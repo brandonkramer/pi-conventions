@@ -1,3 +1,4 @@
+/** @fileoverview String parsing utilities for config normalization. */
 import type { EnforcementMode } from "./types.ts";
 
 export function parseMode(value: unknown, fallback: EnforcementMode): EnforcementMode {

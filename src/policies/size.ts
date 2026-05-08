@@ -1,3 +1,4 @@
+/** @fileoverview Size policy normalization and evaluation. */
 import { normalizePrefix } from "../core/path.ts";
 import {
 	compilePathPatterns,
@@ -8,6 +9,8 @@ import { parseMode, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawSizeLimit {
+	id?: string;
+	exclude?: unknown[];
 	prefixes?: unknown[];
 	extensions?: unknown[];
 	maxLines?: unknown;
@@ -27,6 +30,9 @@ export interface RawSizePolicyConfig {
 }
 
 export interface SizeLimit {
+	id?: string;
+	exclude: string[];
+	excludeMatchers: PathPattern[];
 	prefixes: string[];
 	prefixMatchers: PathPattern[];
 	extensions: string[];
@@ -91,11 +97,13 @@ export function evaluateSizeViolation(
 ): Violation | undefined {
 	for (const limit of config.limits) {
 		if (!matchesLimit(relativePath, limit)) continue;
+		if (matchesAnyPathPattern(relativePath, limit.excludeMatchers)) continue;
 
 		const issue = evaluateLimit(relativePath, content, limit);
 		if (issue) {
 			return {
 				policyId: "size",
+				ruleId: limit.id,
 				mode: exists ? limit.onEdit : limit.onCreate,
 				reason: issue,
 			};
@@ -156,7 +164,14 @@ function normalizeLimit(
 
 	const extensions = uniqueStrings(raw.extensions, normalizeExtension);
 	const reason = typeof raw.reason === "string" ? raw.reason.trim() : undefined;
+	const exclude = uniqueStrings(raw.exclude, (value) => value);
 	return {
+		id:
+			typeof raw.id === "string" && raw.id.trim().length > 0
+				? raw.id.trim()
+				: undefined,
+		exclude,
+		excludeMatchers: compilePathPatterns(exclude),
 		prefixes,
 		prefixMatchers: compilePathPatterns(prefixes),
 		extensions,

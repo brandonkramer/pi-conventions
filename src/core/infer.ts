@@ -1,3 +1,4 @@
+/** @fileoverview Infers conventions from repository structure and files. */
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import type { RawConventionsConfig } from "./types.ts";
