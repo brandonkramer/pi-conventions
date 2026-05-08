@@ -9,6 +9,10 @@ import {
 } from "../policies/documentation.ts";
 import { evaluateNamingViolation } from "../policies/naming.ts";
 import {
+	evaluatePackageViolation,
+	packagePolicyMatchesPath,
+} from "../policies/package.ts";
+import {
 	evaluateSizeViolation,
 	sizePolicyMatchesPath,
 } from "../policies/size.ts";
@@ -26,6 +30,7 @@ export interface EvaluationInput {
 	relativePath: string;
 	exists: boolean;
 	content?: string;
+	cwd?: string;
 }
 
 export function collectViolations(
@@ -85,6 +90,17 @@ export function collectViolations(
 		if (violation) violations.push(violation);
 	}
 
+	if (config.policies.package && input.content !== undefined) {
+		const violation = evaluatePackageViolation(
+			input.relativePath,
+			input.exists,
+			input.content,
+			config.policies.package,
+			input.cwd,
+		);
+		if (violation) violations.push(violation);
+	}
+
 	return violations;
 }
 
@@ -104,7 +120,9 @@ export function needsContentForPath(
 				dependenciesPolicyMatchesPath(
 					relativePath,
 					config.policies.dependencies,
-				)),
+				)) ||
+			(config.policies.package &&
+				packagePolicyMatchesPath(relativePath, config.policies.package)),
 	);
 }
 

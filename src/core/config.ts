@@ -5,6 +5,7 @@ import path from "node:path";
 import { normalizeDependenciesPolicy } from "../policies/dependencies.ts";
 import { normalizeDocumentationPolicy } from "../policies/documentation.ts";
 import { normalizeNamingPolicy } from "../policies/naming.ts";
+import { normalizePackagePolicy } from "../policies/package.ts";
 import { normalizeSizePolicy } from "../policies/size.ts";
 import { normalizeStructurePolicy } from "../policies/structure.ts";
 import { compilePathPatterns } from "./pattern.ts";
@@ -60,7 +61,8 @@ export function hasActivePolicies(config: ConventionsConfig): boolean {
 			config.policies.naming ||
 			config.policies.documentation ||
 			config.policies.size ||
-			config.policies.dependencies,
+			config.policies.dependencies ||
+			config.policies.package,
 	);
 }
 
@@ -169,6 +171,7 @@ function normalizeConventionsConfig(
 			dependencies: normalizeDependenciesPolicy(
 				envelope?.policies?.dependencies,
 			),
+			package: normalizePackagePolicy(envelope?.policies?.package),
 		},
 	};
 }
@@ -211,7 +214,34 @@ function mergeRawConventionsConfig(
 				projectConfig?.policies?.dependencies,
 				"rules",
 			),
+			package: mergePackagePolicy(
+				globalConfig?.policies?.package,
+				projectConfig?.policies?.package,
+			),
 		},
+	};
+}
+
+function mergePackagePolicy(
+	globalPolicy: unknown,
+	projectPolicy: unknown,
+): any {
+	const globalRecord = asRecord(globalPolicy);
+	const projectRecord = asRecord(projectPolicy);
+	if (!globalRecord && !projectRecord) return undefined;
+	return {
+		...globalRecord,
+		...projectRecord,
+		manifests: concatArrays(globalRecord?.manifests, projectRecord?.manifests),
+		requireFields: concatArrays(
+			globalRecord?.requireFields,
+			projectRecord?.requireFields,
+		),
+		requireFiles: concatArrays(
+			globalRecord?.requireFiles,
+			projectRecord?.requireFiles,
+		),
+		notes: concatArrays(globalRecord?.notes, projectRecord?.notes),
 	};
 }
 

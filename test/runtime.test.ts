@@ -737,3 +737,178 @@ describe("runtime audit JSON and policy filter", () => {
 		}
 	});
 });
+
+describe("runtime audit --changed", () => {
+	async function runConventions(repo: string, args: string): Promise<string> {
+		const { commands } = createHarness();
+		const messages: string[] = [];
+		const ctx = {
+			cwd: repo,
+			hasUI: true,
+			ui: {
+				setStatus: () => undefined,
+				notify: (message: string) => messages.push(message),
+			},
+		};
+		await commands.get("conventions").handler(args, ctx);
+		return messages[messages.length - 1] ?? "";
+	}
+
+	it("audits staged, unstaged, and untracked files only", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-changed-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await writeText(repo, "src/clean.ts", "a\nb\n");
+			await writeText(repo, "src/staged.ts", "a\n");
+			await writeText(repo, "src/unstaged.ts", "a\n");
+			await runGit(repo, ["init", "--quiet"]);
+			await runGit(repo, [
+				"-c",
+				"user.email=t@t",
+				"-c",
+				"user.name=t",
+				"add",
+				"-A",
+			]);
+			await runGit(repo, [
+				"-c",
+				"user.email=t@t",
+				"-c",
+				"user.name=t",
+				"commit",
+				"-m",
+				"init",
+			]);
+			await writeText(repo, "src/staged.ts", "a\nb\n");
+			await writeText(repo, "src/unstaged.ts", "a\nb\n");
+			await writeText(repo, "src/untracked.ts", "a\nb\n");
+			await runGit(repo, ["add", "src/staged.ts"]);
+
+			const output = await runConventions(repo, "audit --changed --json");
+			const parsed = JSON.parse(output);
+			const paths = parsed.findings.map((f: any) => f.path).sort();
+			expect(paths).toEqual([
+				"src/staged.ts",
+				"src/unstaged.ts",
+				"src/untracked.ts",
+			]);
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("composes with --policy filter", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-changed-policy-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+					documentation: {
+						rules: [{ kind: "requireFileOverview", paths: ["src/**"] }],
+					},
+				},
+			});
+			await writeText(repo, "src/file.ts", "a\nb\n");
+			await runGit(repo, ["init", "--quiet"]);
+
+			const output = await runConventions(
+				repo,
+				"audit --changed --json --policy size",
+			);
+			const parsed = JSON.parse(output);
+			expect(parsed.findings.length).toBeGreaterThan(0);
+			for (const finding of parsed.findings) {
+				expect(finding.policyId).toBe("size");
+			}
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("skips deleted files without crashing", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-changed-delete-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await writeText(repo, "src/will-delete.ts", "a\nb\n");
+			await runGit(repo, ["init", "--quiet"]);
+			await runGit(repo, [
+				"-c",
+				"user.email=t@t",
+				"-c",
+				"user.name=t",
+				"add",
+				"-A",
+			]);
+			await runGit(repo, [
+				"-c",
+				"user.email=t@t",
+				"-c",
+				"user.name=t",
+				"commit",
+				"-m",
+				"init",
+			]);
+			await runGit(repo, ["rm", "src/will-delete.ts"]);
+
+			const output = await runConventions(repo, "audit --changed --json");
+			const parsed = JSON.parse(output);
+			expect(parsed.findings).toEqual([]);
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("reports clear error outside Git", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-changed-nogit-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+
+			const output = await runConventions(repo, "audit --changed");
+			expect(output).toContain("requires a Git repository");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+
+	it("rejects --changed combined with --include-ignored", async () => {
+		const repo = await createTempDir("pcg-runtime-audit-changed-ignored-");
+		try {
+			await writeJson(repo, ".pi/conventions.json", {
+				policies: {
+					size: {
+						limits: [{ prefixes: ["src/"], extensions: ["ts"], maxLines: 1 }],
+					},
+				},
+			});
+			await runGit(repo, ["init", "--quiet"]);
+
+			const output = await runConventions(
+				repo,
+				"audit --changed --include-ignored",
+			);
+			expect(output).toContain("cannot be combined");
+		} finally {
+			await removeTempDir(repo);
+		}
+	});
+});

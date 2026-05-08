@@ -20,16 +20,17 @@ When active policies exist, the extension injects a compact `## Conventions` sum
 
 ## Commands
 
-| Command                                | Use                                                                                       |
-| -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `/conventions`                         | Show active config                                                                        |
-| `/conventions create [<lang>]`         | Scaffold config (`rust`, `typescript`, `ts`, `go`, `python`, `documentation`, `fallback`) |
-| `/conventions reload`                  | Reload after manual config edits                                                          |
-| `/conventions check <path>`            | Evaluate one file or proposed path                                                        |
-| `/conventions audit`                   | Read-only repo scan (Git-aware; falls back to built-in ignore list)                       |
-| `/conventions audit --include-ignored` | Include Git-ignored files                                                                 |
-| `--json`                               | Machine-readable output (works on `check` and `audit`)                                    |
-| `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`      |
+| Command                                | Use                                                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `/conventions`                         | Show active config                                                                              |
+| `/conventions create [<lang>]`         | Scaffold config (`rust`, `typescript`, `ts`, `go`, `python`, `documentation`, `fallback`)       |
+| `/conventions reload`                  | Reload after manual config edits                                                                |
+| `/conventions check <path>`            | Evaluate one file or proposed path                                                              |
+| `/conventions audit`                   | Read-only repo scan (Git-aware; falls back to built-in ignore list)                             |
+| `/conventions audit --include-ignored` | Include Git-ignored files                                                                       |
+| `/conventions audit --changed`         | Audit only locally changed files (staged + unstaged + untracked; deleted files skipped)         |
+| `--json`                               | Machine-readable output (works on `check` and `audit`)                                          |
+| `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`, `package` |
 
 ## Config shape
 
@@ -111,4 +112,6 @@ Each rule/limit accepts an optional `id` (surfaced in diagnostics as `policy:id`
 
 **Documentation** — deterministic rules: `requireTsdocOnExports`, `requireFileOverview`, `forbidFileHeaders`, `forbidCommentPatterns`, `todoFormat`, `requireRationaleComments`.
 
-All policies default to `warn` and are additive — present only what you configure. Modes: `warn`, `confirm`, `block`. See `examples/` for focused starting points (`conventions.size.json`, `conventions.documentation.json`, `conventions.dependencies.json`, `conventions.extends-global.json`).
+**Package** — manifest hygiene for npm/Pi packages: `requireFields`, `requireFiles`, `piPackage.requireKeyword`, `piPackage.verifyResourcePaths` (verifies `pi.extensions[]`/`pi.skills[]` paths exist), and `npm.requireFilesCoverage` (verifies `package.json` `files` covers configured entries). All checks are local file/JSON — no network, no `npm publish`.
+
+All policies default to `warn` and are additive — present only what you configure. Modes: `warn`, `confirm`, `block`. See `examples/` for focused starting points (`conventions.size.json`, `conventions.documentation.json`, `conventions.dependencies.json`, `conventions.package.json`, `conventions.extends-global.json`).

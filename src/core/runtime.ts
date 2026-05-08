@@ -16,6 +16,7 @@ import {
 } from "./create.ts";
 import {
 	auditConventions,
+	ChangedAuditError,
 	checkConventionsPath,
 	KNOWN_POLICY_IDS,
 } from "./diagnostics.ts";
@@ -154,7 +155,10 @@ export default function conventionsGuard(pi: ExtensionAPI) {
 			? await derivePostMutationContent(event.input, absolutePath, isWrite)
 			: undefined;
 		const violation = strongestViolation(
-			collectViolations({ relativePath, exists, content }, state.config),
+			collectViolations(
+				{ relativePath, exists, content, cwd: ctx.cwd },
+				state.config,
+			),
 		);
 
 		if (!violation) {
@@ -294,11 +298,17 @@ async function handleAudit(
 	const tokens = rawTarget.split(/\s+/).filter(Boolean);
 	const includeIgnored = tokens.includes("--include-ignored");
 	const json = tokens.includes("--json");
+	const changed = tokens.includes("--changed");
 	let policy: string | undefined;
 	const unknown: string[] = [];
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
-		if (token === "--include-ignored" || token === "--json") continue;
+		if (
+			token === "--include-ignored" ||
+			token === "--json" ||
+			token === "--changed"
+		)
+			continue;
 		if (token === "--policy") {
 			policy = tokens[++i];
 			continue;
@@ -312,7 +322,7 @@ async function handleAudit(
 	if (unknown.length > 0) {
 		return {
 			message:
-				"Usage: /conventions audit [--include-ignored] [--json] [--policy <name>]",
+				"Usage: /conventions audit [--include-ignored] [--changed] [--json] [--policy <name>]",
 			level: "warning",
 		};
 	}
@@ -322,14 +332,22 @@ async function handleAudit(
 			level: "warning",
 		};
 	}
-	return {
-		message: await auditConventions(cwd, state.config, {
-			includeIgnored,
-			json,
-			policy,
-		}),
-		level: "info",
-	};
+	try {
+		return {
+			message: await auditConventions(cwd, state.config, {
+				includeIgnored,
+				changed,
+				json,
+				policy,
+			}),
+			level: "info",
+		};
+	} catch (error) {
+		if (error instanceof ChangedAuditError) {
+			return { message: error.message, level: "warning" };
+		}
+		throw error;
+	}
 }
 
 async function notifyCommandResult(
@@ -433,6 +451,26 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 		}
 	}
 
+	if (config.policies.package) {
+		const policy = config.policies.package;
+		lines.push(
+			`Package policy: create ${policy.mode}; edit ${policy.editMode}.`,
+		);
+		const checks: string[] = [];
+		if (policy.requireFields.length > 0)
+			checks.push(`fields ${policy.requireFields.join(",")}`);
+		if (policy.requireFiles.length > 0)
+			checks.push(`files ${policy.requireFiles.join(",")}`);
+		if (policy.piRequireKeyword)
+			checks.push(`keyword ${policy.piRequireKeyword}`);
+		if (policy.piVerifyResourcePaths) checks.push("verify pi resource paths");
+		if (policy.npmRequireFilesCoverage.length > 0)
+			checks.push(`files coverage ${policy.npmRequireFilesCoverage.join(",")}`);
+		if (checks.length > 0) {
+			lines.push(`- ${policy.manifests.join(",")}: ${checks.join("; ")}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 
@@ -470,6 +508,7 @@ function activePolicySummary(config: ConventionsConfig): string {
 	if (config.policies.documentation) policies.push("documentation");
 	if (config.policies.size) policies.push("size");
 	if (config.policies.dependencies) policies.push("dependencies");
+	if (config.policies.package) policies.push("package");
 	return policies.length > 0 ? policies.join(", ") : "no active policies";
 }
 

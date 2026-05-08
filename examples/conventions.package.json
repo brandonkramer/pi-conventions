@@ -1,0 +1,24 @@
+{
+  "$schema": "../schemas/conventions.schema.json",
+  "notes": [
+    "Package manifest hygiene for npm/Pi packages.",
+    "All checks are deterministic and local; no network calls."
+  ],
+  "policies": {
+    "package": {
+      "id": "package.hygiene",
+      "mode": "warn",
+      "editMode": "warn",
+      "manifests": ["package.json"],
+      "requireFields": ["name", "version", "license", "repository", "homepage", "bugs", "engines"],
+      "requireFiles": ["README.md", "LICENSE"],
+      "piPackage": {
+        "requireKeyword": "pi-package",
+        "verifyResourcePaths": true
+      },
+      "npm": {
+        "requireFilesCoverage": ["src", "schemas", "examples", "skills", "README.md"]
+      }
+    }
+  }
+}

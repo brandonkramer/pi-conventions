@@ -41,6 +41,9 @@
         },
         "dependencies": {
           "$ref": "#/$defs/dependenciesPolicy"
+        },
+        "package": {
+          "$ref": "#/$defs/packagePolicy"
         }
       }
     }
@@ -524,6 +527,49 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "packagePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "mode": { "$ref": "#/$defs/enforcementMode" },
+        "editMode": { "$ref": "#/$defs/enforcementMode" },
+        "manifests": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requireFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requireFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "piPackage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requireKeyword": { "type": "string" },
+            "verifyResourcePaths": { "type": "boolean" }
+          }
+        },
+        "npm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requireFilesCoverage": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       }
     }

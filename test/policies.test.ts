@@ -11,6 +11,13 @@ import {
 	evaluateNamingViolation,
 	normalizeNamingPolicy,
 } from "../src/policies/naming.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+	evaluatePackageViolation,
+	normalizePackagePolicy,
+} from "../src/policies/package.ts";
 import {
 	evaluateSizeViolation,
 	normalizeSizePolicy,
@@ -670,5 +677,118 @@ describe("structure policy rule ids", () => {
 			config!,
 		);
 		expect(violation?.ruleId).toBe("legacy.monolith");
+	});
+});
+
+describe("package policy", () => {
+	it("flags missing required field", () => {
+		const config = normalizePackagePolicy({
+			requireFields: ["name", "version", "license"],
+		});
+		const violation = evaluatePackageViolation(
+			"package.json",
+			true,
+			JSON.stringify({ name: "x", version: "0.1.0" }),
+			config!,
+			undefined,
+		);
+		expect(violation?.reason).toContain("license");
+	});
+
+	it("flags missing pi-package keyword", () => {
+		const config = normalizePackagePolicy({
+			piPackage: { requireKeyword: "pi-package" },
+		});
+		const violation = evaluatePackageViolation(
+			"package.json",
+			true,
+			JSON.stringify({ keywords: ["other"] }),
+			config!,
+			undefined,
+		);
+		expect(violation?.reason).toContain("pi-package");
+	});
+
+	it("flags missing files coverage", () => {
+		const config = normalizePackagePolicy({
+			npm: { requireFilesCoverage: ["src", "schemas"] },
+		});
+		const violation = evaluatePackageViolation(
+			"package.json",
+			true,
+			JSON.stringify({ files: ["src"] }),
+			config!,
+			undefined,
+		);
+		expect(violation?.reason).toContain("schemas");
+	});
+
+	it("verifies pi.extensions paths exist", () => {
+		const dir = mkdtempSync(join(tmpdir(), "pkg-policy-"));
+		try {
+			const manifest = JSON.stringify({
+				pi: { extensions: ["./src/index.ts"] },
+			});
+			const config = normalizePackagePolicy({
+				piPackage: { verifyResourcePaths: true },
+			});
+			const missing = evaluatePackageViolation(
+				"package.json",
+				true,
+				manifest,
+				config!,
+				dir,
+			);
+			expect(missing?.reason).toContain("src/index.ts");
+
+			mkdirSync(join(dir, "src"));
+			writeFileSync(join(dir, "src/index.ts"), "export {};");
+			const pass = evaluatePackageViolation(
+				"package.json",
+				true,
+				manifest,
+				config!,
+				dir,
+			);
+			expect(pass).toBeUndefined();
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("flags missing sibling files like LICENSE", () => {
+		const dir = mkdtempSync(join(tmpdir(), "pkg-policy-files-"));
+		try {
+			const config = normalizePackagePolicy({
+				requireFiles: ["LICENSE"],
+			});
+			const violation = evaluatePackageViolation(
+				"package.json",
+				true,
+				"{}",
+				config!,
+				dir,
+			);
+			expect(violation?.reason).toContain("LICENSE");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("returns undefined when policy is empty", () => {
+		const config = normalizePackagePolicy({});
+		expect(config).toBeUndefined();
+	});
+
+	it("surfaces invalid JSON as violation", () => {
+		const config = normalizePackagePolicy({ requireFields: ["name"] });
+		const violation = evaluatePackageViolation(
+			"package.json",
+			true,
+			"not valid json",
+			config!,
+			undefined,
+		);
+		expect(violation?.reason).toContain("not valid JSON");
 	});
 });

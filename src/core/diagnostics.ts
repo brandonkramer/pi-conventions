@@ -33,14 +33,18 @@ export const KNOWN_POLICY_IDS = [
 	"documentation",
 	"size",
 	"dependencies",
+	"package",
 ] as const;
 export type KnownPolicyId = (typeof KNOWN_POLICY_IDS)[number];
 
 export interface AuditConventionsOptions {
 	includeIgnored?: boolean;
+	changed?: boolean;
 	json?: boolean;
 	policy?: string;
 }
+
+export class ChangedAuditError extends Error {}
 
 export interface CheckConventionsOptions {
 	json?: boolean;
@@ -58,7 +62,7 @@ export async function checkConventionsPath(
 	const exists = await pathExists(absolutePath);
 	const content = await readContentIfNeeded(cwd, relativePath, exists, config);
 	const violations = filterViolations(
-		collectViolations({ relativePath, exists, content }, config),
+		collectViolations({ relativePath, exists, content, cwd }, config),
 		options.policy,
 	);
 	if (options.json) {
@@ -81,7 +85,14 @@ export async function auditConventions(
 	config: ConventionsConfig,
 	options: AuditConventionsOptions = {},
 ): Promise<string> {
-	const files = await listAuditFiles(cwd, config, options);
+	if (options.changed && options.includeIgnored) {
+		throw new ChangedAuditError(
+			"--changed and --include-ignored cannot be combined.",
+		);
+	}
+	const files = options.changed
+		? await listChangedFiles(cwd, config)
+		: await listAuditFiles(cwd, config, options);
 	const findings: DiagnosticFinding[] = [];
 
 	for (const relativePath of files) {
@@ -90,7 +101,7 @@ export async function auditConventions(
 		}
 		const content = await readContentIfNeeded(cwd, relativePath, true, config);
 		for (const violation of collectViolations(
-			{ relativePath, exists: true, content },
+			{ relativePath, exists: true, content, cwd },
 			config,
 		)) {
 			if (options.policy && violation.policyId !== options.policy) continue;
@@ -146,6 +157,69 @@ async function readContentIfNeeded(
 	} catch {
 		return undefined;
 	}
+}
+
+async function listChangedFiles(
+	cwd: string,
+	config: ConventionsConfig,
+): Promise<string[]> {
+	try {
+		await execFileAsync("git", ["rev-parse", "--git-dir"], { cwd });
+	} catch {
+		throw new ChangedAuditError(
+			"--changed requires a Git repository. Run from inside a Git repo or use a full audit.",
+		);
+	}
+	const { stdout } = await execFileAsync(
+		"git",
+		["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+		{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+	);
+	return parseGitStatus(stdout)
+		.filter((f) => !matchesAnyPathPattern(f, config.ignoreMatchers))
+		.sort();
+}
+
+function parseGitStatus(stdout: string): string[] {
+	const entries = stdout.split("\0");
+	const paths: string[] = [];
+	const seen = new Set<string>();
+	let i = 0;
+	while (i < entries.length) {
+		const entry = entries[i];
+		if (!entry) {
+			i++;
+			continue;
+		}
+		const xy = entry.slice(0, 2);
+		const pathPart = entry.slice(3);
+		const staged = xy[0];
+		const unstaged = xy[1];
+		const isRename = staged === "R" || unstaged === "R";
+		const isDelete =
+			(staged === "D" && unstaged !== "M") ||
+			(unstaged === "D" && staged === " ");
+		if (isRename) {
+			// porcelain v1 -z encodes renames as `XY new\0old\0`; new is current.
+			i += 2;
+			if (!isDelete) {
+				const normalized = normalizeRelativePath(pathPart);
+				if (!seen.has(normalized)) {
+					seen.add(normalized);
+					paths.push(normalized);
+				}
+			}
+			continue;
+		}
+		i++;
+		if (isDelete) continue;
+		const normalized = normalizeRelativePath(pathPart);
+		if (!seen.has(normalized)) {
+			seen.add(normalized);
+			paths.push(normalized);
+		}
+	}
+	return paths;
 }
 
 async function listAuditFiles(

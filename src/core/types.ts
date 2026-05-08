@@ -12,6 +12,10 @@ import type {
 	RawNamingPolicyConfig,
 } from "../policies/naming.ts";
 import type {
+	PackagePolicyConfig,
+	RawPackagePolicyConfig,
+} from "../policies/package.ts";
+import type {
 	RawSizePolicyConfig,
 	SizePolicyConfig,
 } from "../policies/size.ts";
@@ -39,6 +43,7 @@ export interface RawConventionsConfig {
 		documentation?: RawDocumentationPolicyConfig;
 		size?: RawSizePolicyConfig;
 		dependencies?: RawDependenciesPolicyConfig;
+		package?: RawPackagePolicyConfig;
 	};
 }
 
@@ -55,6 +60,7 @@ export interface ConventionsConfig {
 		documentation?: DocumentationPolicyConfig;
 		size?: SizePolicyConfig;
 		dependencies?: DependenciesPolicyConfig;
+		package?: PackagePolicyConfig;
 	};
 }
 
