@@ -902,9 +902,7 @@ describe("files policy", () => {
 			expect(findings[0].violation.ruleId).toBe("agents");
 
 			writeFileSync(join(dir, "AGENTS.md"), "hi");
-			expect(
-				evaluateFilesGlobalRequireFindings(config!, dir),
-			).toHaveLength(0);
+			expect(evaluateFilesGlobalRequireFindings(config!, dir)).toHaveLength(0);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
@@ -914,7 +912,12 @@ describe("files policy", () => {
 		const config = normalizeFilesPolicy({
 			rules: [{ id: "no-eslintrc", forbid: [".eslintrc.json"] }],
 		});
-		const v = evaluateFilesViolation(".eslintrc.json", true, config!, undefined);
+		const v = evaluateFilesViolation(
+			".eslintrc.json",
+			true,
+			config!,
+			undefined,
+		);
 		expect(v?.ruleId).toBe("no-eslintrc");
 	});
 
@@ -932,23 +935,13 @@ describe("files policy", () => {
 					},
 				],
 			});
-			const missing = evaluateFilesViolation(
-				"src/foo.ts",
-				true,
-				config!,
-				dir,
-			);
+			const missing = evaluateFilesViolation("src/foo.ts", true, config!, dir);
 			expect(missing?.ruleId).toBe("source-has-test");
 			expect(missing?.reason).toContain("test/foo.test.ts");
 
 			mkdirSync(join(dir, "test"));
 			writeFileSync(join(dir, "test/foo.test.ts"), "");
-			const pass = evaluateFilesViolation(
-				"src/foo.ts",
-				true,
-				config!,
-				dir,
-			);
+			const pass = evaluateFilesViolation("src/foo.ts", true, config!, dir);
 			expect(pass).toBeUndefined();
 		} finally {
 			rmSync(dir, { recursive: true, force: true });

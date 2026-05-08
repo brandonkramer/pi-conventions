@@ -208,10 +208,7 @@ function normalizeRule(
 		raw.forbidSpecifiers,
 		(value) => value,
 	);
-	const allowSpecifiers = uniqueStrings(
-		raw.allowSpecifiers,
-		(value) => value,
-	);
+	const allowSpecifiers = uniqueStrings(raw.allowSpecifiers, (value) => value);
 	if (from.length === 0) return undefined;
 	if (to.length === 0 && forbidSpecifiers.length === 0) return undefined;
 

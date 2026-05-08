@@ -20,16 +20,16 @@ When active policies exist, the extension injects a compact `## Conventions` sum
 
 ## Commands
 
-| Command                                | Use                                                                                             |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `/conventions`                         | Show active config                                                                              |
-| `/conventions create [<lang>]`         | Scaffold config (`rust`, `typescript`, `ts`, `go`, `python`, `documentation`, `fallback`)       |
-| `/conventions reload`                  | Reload after manual config edits                                                                |
-| `/conventions check <path>`            | Evaluate one file or proposed path                                                              |
-| `/conventions audit`                   | Read-only repo scan (Git-aware; falls back to built-in ignore list)                             |
-| `/conventions audit --include-ignored` | Include Git-ignored files                                                                       |
-| `/conventions audit --changed`         | Audit only locally changed files (staged + unstaged + untracked; deleted files skipped)         |
-| `--json`                               | Machine-readable output (works on `check` and `audit`)                                          |
+| Command                                | Use                                                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `/conventions`                         | Show active config                                                                                       |
+| `/conventions create [<lang>]`         | Scaffold config (`rust`, `typescript`, `ts`, `go`, `python`, `documentation`, `fallback`)                |
+| `/conventions reload`                  | Reload after manual config edits                                                                         |
+| `/conventions check <path>`            | Evaluate one file or proposed path                                                                       |
+| `/conventions audit`                   | Read-only repo scan (Git-aware; falls back to built-in ignore list)                                      |
+| `/conventions audit --include-ignored` | Include Git-ignored files                                                                                |
+| `/conventions audit --changed`         | Audit only locally changed files (staged + unstaged + untracked; deleted files skipped)                  |
+| `--json`                               | Machine-readable output (works on `check` and `audit`)                                                   |
 | `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`, `package`, `files` |
 
 ## Config shape
