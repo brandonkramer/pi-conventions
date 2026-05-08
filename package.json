@@ -41,7 +41,7 @@
     ]
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "scripts": {
     "test": "vitest run",
@@ -49,7 +49,7 @@
     "conventions:audit": "npx tsx -e \"(async () => { const { loadState } = await import('./src/core/config.ts'); const { auditConventions } = await import('./src/core/diagnostics.ts'); const s = await loadState(process.cwd()); console.log(await auditConventions(process.cwd(), s.config!)); })();\""
   },
   "devDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
+    "@earendil-works/pi-coding-agent": "*",
     "vitest": "^4.1.2"
   }
 }

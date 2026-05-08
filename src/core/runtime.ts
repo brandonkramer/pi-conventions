@@ -5,7 +5,7 @@ import path from "node:path";
 import {
 	type ExtensionAPI,
 	isToolCallEventType,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { hasActivePolicies, loadState } from "./config.ts";
 import { derivePostMutationContent } from "./content.ts";
 import {
