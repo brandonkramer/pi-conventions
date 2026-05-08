@@ -96,7 +96,11 @@ async function listAuditFiles(
 				["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
 				{ cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
 			);
-			return [...new Set(stdout.split("\0").filter(Boolean).map(normalizeRelativePath))].sort();
+			return [
+				...new Set(
+					stdout.split("\0").filter(Boolean).map(normalizeRelativePath),
+				),
+			].sort();
 		} catch {
 			// fall through to filesystem walk
 		}

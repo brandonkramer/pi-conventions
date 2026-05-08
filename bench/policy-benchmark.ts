@@ -5,12 +5,17 @@ import {
 	normalizeDocumentationPolicy,
 	evaluateDocumentationViolation,
 } from "../src/policies/documentation.ts";
-import { compilePathPatterns, matchesAnyPathPattern } from "../src/core/pattern.ts";
+import {
+	compilePathPatterns,
+	matchesAnyPathPattern,
+} from "../src/core/pattern.ts";
 import { normalizeRelativePath } from "../src/core/path.ts";
 import { uniqueStrings } from "../src/core/strings.ts";
 import { findLeadingBlockComment } from "../src/policies/documentation.ts";
 
-function extractCommentLines(content: string): { line: number; text: string }[] {
+function extractCommentLines(
+	content: string,
+): { line: number; text: string }[] {
 	const result: { line: number; text: string }[] = [];
 	const lines = content.split(/\r?\n/);
 	for (let index = 0; index < lines.length; index += 1) {
@@ -130,20 +135,59 @@ const normTime = timeOnce(() =>
 	normalizeDocumentationPolicy({
 		mode: "warn",
 		rules: [
-			{ kind: "requireTsdocOnExports", paths: ["src/**/*.ts"], declarations: ["interface", "type", "function", "class", "const"], requireRemarks: true },
-			{ kind: "requireFileOverview", paths: ["src/**/*.ts"], requiredTags: ["@fileoverview"], requiredSections: ["Design:"] },
-			{ kind: "forbidFileHeaders", paths: ["src/**"], patterns: ["copyright", "licensed under", "spdx-license-identifier"] },
-			{ kind: "forbidCommentPatterns", paths: ["src/**"], patterns: ["PR #", "ticket"] },
-			{ kind: "todoFormat", paths: ["src/**"], allowedTags: ["TODO", "FIXME"], format: "TAG: concrete action - referent" },
-			{ kind: "requireRationaleComments", paths: ["src/http/*.ts"], commentKeywords: ["SSRF", "security", "invariant", "because", "must"], minMatches: 1 },
+			{
+				kind: "requireTsdocOnExports",
+				paths: ["src/**/*.ts"],
+				declarations: ["interface", "type", "function", "class", "const"],
+				requireRemarks: true,
+			},
+			{
+				kind: "requireFileOverview",
+				paths: ["src/**/*.ts"],
+				requiredTags: ["@fileoverview"],
+				requiredSections: ["Design:"],
+			},
+			{
+				kind: "forbidFileHeaders",
+				paths: ["src/**"],
+				patterns: ["copyright", "licensed under", "spdx-license-identifier"],
+			},
+			{
+				kind: "forbidCommentPatterns",
+				paths: ["src/**"],
+				patterns: ["PR #", "ticket"],
+			},
+			{
+				kind: "todoFormat",
+				paths: ["src/**"],
+				allowedTags: ["TODO", "FIXME"],
+				format: "TAG: concrete action - referent",
+			},
+			{
+				kind: "requireRationaleComments",
+				paths: ["src/http/*.ts"],
+				commentKeywords: ["SSRF", "security", "invariant", "because", "must"],
+				minMatches: 1,
+			},
 		],
 	}),
 );
 
 // 2. Full violation evaluation (hot path on every write/edit)
-const smallEval = time(() => evaluateDocumentationViolation("src/fetch.ts", true, small, config!), 1000);
-const mediumEval = time(() => evaluateDocumentationViolation("src/pipeline.ts", true, medium, config!), 500);
-const largeEval = time(() => evaluateDocumentationViolation("src/orchestrator.ts", true, large, config!), 100);
+const smallEval = time(
+	() => evaluateDocumentationViolation("src/fetch.ts", true, small, config!),
+	1000,
+);
+const mediumEval = time(
+	() =>
+		evaluateDocumentationViolation("src/pipeline.ts", true, medium, config!),
+	500,
+);
+const largeEval = time(
+	() =>
+		evaluateDocumentationViolation("src/orchestrator.ts", true, large, config!),
+	100,
+);
 
 // 3. Individual parser components
 const commentLinesBench = time(() => extractCommentLines(medium), 1000);
@@ -151,23 +195,50 @@ const commentsBench = time(() => extractComments(medium), 1000);
 const overviewBench = time(() => findLeadingBlockComment(medium), 1000);
 
 // 4. Path pattern compilation + matching
-const patterns = compilePathPatterns(["src/**/*.ts", "src/http/*.ts", "src/tools/{define,result,progress}.ts"]);
-const pathMatchBench = time(() => matchesAnyPathPattern("src/http/client.ts", patterns), 10000);
+const patterns = compilePathPatterns([
+	"src/**/*.ts",
+	"src/http/*.ts",
+	"src/tools/{define,result,progress}.ts",
+]);
+const pathMatchBench = time(
+	() => matchesAnyPathPattern("src/http/client.ts", patterns),
+	10000,
+);
 
 // 5. String utilities
-const strsBench = time(() => uniqueStrings(["a", "b", "a", "c", "b", "d"], (s) => s), 10000);
-const normPathBench = time(() => normalizeRelativePath("./src//foo/../bar.ts"), 10000);
+const strsBench = time(
+	() => uniqueStrings(["a", "b", "a", "c", "b", "d"], (s) => s),
+	10000,
+);
+const normPathBench = time(
+	() => normalizeRelativePath("./src//foo/../bar.ts"),
+	10000,
+);
 
 // Output
 console.log(`METRIC norm_ms=${(normTime.ms * 1000).toFixed(1)}`);
 console.log(`METRIC eval_small_us=${(smallEval.medianMs * 1000).toFixed(1)}`);
 console.log(`METRIC eval_medium_us=${(mediumEval.medianMs * 1000).toFixed(1)}`);
 console.log(`METRIC eval_large_us=${(largeEval.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC extract_comment_lines_us=${(commentLinesBench.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC extract_comments_us=${(commentsBench.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC find_overview_us=${(overviewBench.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC path_match_us=${(pathMatchBench.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC unique_strings_us=${(strsBench.medianMs * 1000).toFixed(1)}`);
-console.log(`METRIC norm_path_us=${(normPathBench.medianMs * 1000).toFixed(1)}`);
+console.log(
+	`METRIC extract_comment_lines_us=${(commentLinesBench.medianMs * 1000).toFixed(1)}`,
+);
+console.log(
+	`METRIC extract_comments_us=${(commentsBench.medianMs * 1000).toFixed(1)}`,
+);
+console.log(
+	`METRIC find_overview_us=${(overviewBench.medianMs * 1000).toFixed(1)}`,
+);
+console.log(
+	`METRIC path_match_us=${(pathMatchBench.medianMs * 1000).toFixed(1)}`,
+);
+console.log(
+	`METRIC unique_strings_us=${(strsBench.medianMs * 1000).toFixed(1)}`,
+);
+console.log(
+	`METRIC norm_path_us=${(normPathBench.medianMs * 1000).toFixed(1)}`,
+);
 console.log(`---`);
-console.log(`file_sizes chars small=${small.length} medium=${medium.length} large=${large.length}`);
+console.log(
+	`file_sizes chars small=${small.length} medium=${medium.length} large=${large.length}`,
+);

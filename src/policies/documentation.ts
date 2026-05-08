@@ -317,8 +317,10 @@ function normalizeRule(
 			pathMatchers,
 			declarations:
 				declarations.length > 0 ? declarations : DEFAULT_DECLARATIONS,
-			declarationMask: (declarations.length > 0 ? declarations : DEFAULT_DECLARATIONS)
-				.reduce((mask, kind) => mask | DECLARATION_BITS[kind], 0),
+			declarationMask: (declarations.length > 0
+				? declarations
+				: DEFAULT_DECLARATIONS
+			).reduce((mask, kind) => mask | DECLARATION_BITS[kind], 0),
 			requireRemarks: rule.requireRemarks === true,
 		};
 	}
@@ -411,7 +413,8 @@ function evaluateTsdocRule(
 		const line = lines[i];
 		if (!inBlock) {
 			let pos = 0;
-			while (pos < line.length && (line[pos] === " " || line[pos] === "\t")) pos++;
+			while (pos < line.length && (line[pos] === " " || line[pos] === "\t"))
+				pos++;
 			if (line.startsWith("/**", pos)) {
 				inBlock = true;
 				blockStart = i;
@@ -432,7 +435,11 @@ function evaluateTsdocRule(
 		const activeBlock = blockIdx > 0 ? blocks[blockIdx - 1] : undefined;
 
 		const declaration = parseExportDeclaration(lines[index]);
-		if (!declaration || !(DECLARATION_BITS[declaration.kind] & rule.declarationMask)) continue;
+		if (
+			!declaration ||
+			!(DECLARATION_BITS[declaration.kind] & rule.declarationMask)
+		)
+			continue;
 
 		let tsdoc: string | undefined;
 		if (activeBlock) {
@@ -595,4 +602,3 @@ function parseExportDeclaration(
 	if (!match) return undefined;
 	return { kind: match[1] as DocumentationDeclarationKind, name: match[2] };
 }
-
