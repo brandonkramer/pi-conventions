@@ -91,57 +91,49 @@ async function loadProjectState(
 	cwdKey: string,
 	projectConfigPath: string,
 ): Promise<LoadState> {
+	let projectRaw: unknown;
 	try {
-		const projectRaw = await readConfigJson(projectConfigPath);
-		const projectEnvelope = asConventionsConfig(projectRaw);
-		if (projectEnvelope?.extendsGlobal !== true) {
-			return {
-				cwdKey,
-				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
-					projectConfigPath,
-				]),
-			};
-		}
-
-		const fallbackPath = globalConfigPath();
-		if (!(await pathExists(fallbackPath))) {
-			return {
-				cwdKey,
-				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
-					projectConfigPath,
-				]),
-				warnings: [
-					`extendsGlobal is true, but no global conventions file exists at ${fallbackPath}`,
-				],
-			};
-		}
-
-		try {
-			const globalRaw = await readConfigJson(fallbackPath);
-			const mergedRaw = mergeRawConventionsConfig(globalRaw, projectRaw);
-			return {
-				cwdKey,
-				config: normalizeConventionsConfig(mergedRaw, projectConfigPath, [
-					projectConfigPath,
-					fallbackPath,
-				]),
-			};
-		} catch (error: any) {
-			return {
-				cwdKey,
-				config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
-					projectConfigPath,
-				]),
-				warnings: [
-					`failed to load global conventions from ${fallbackPath}: ${error.message}`,
-				],
-			};
-		}
+		projectRaw = await readConfigJson(projectConfigPath);
 	} catch (error: any) {
 		return {
 			cwdKey,
 			error: `failed to load ${projectConfigPath}: ${error.message}`,
 		};
+	}
+
+	const projectOnly = (warnings?: string[]): LoadState => ({
+		cwdKey,
+		config: normalizeConventionsConfig(projectRaw, projectConfigPath, [
+			projectConfigPath,
+		]),
+		...(warnings ? { warnings } : {}),
+	});
+
+	if (asConventionsConfig(projectRaw)?.extendsGlobal !== true) {
+		return projectOnly();
+	}
+
+	const fallbackPath = globalConfigPath();
+	if (!(await pathExists(fallbackPath))) {
+		return projectOnly([
+			`extendsGlobal is true, but no global conventions file exists at ${fallbackPath}`,
+		]);
+	}
+
+	try {
+		const globalRaw = await readConfigJson(fallbackPath);
+		const mergedRaw = mergeRawConventionsConfig(globalRaw, projectRaw);
+		return {
+			cwdKey,
+			config: normalizeConventionsConfig(mergedRaw, projectConfigPath, [
+				projectConfigPath,
+				fallbackPath,
+			]),
+		};
+	} catch (error: any) {
+		return projectOnly([
+			`failed to load global conventions from ${fallbackPath}: ${error.message}`,
+		]);
 	}
 }
 
@@ -193,9 +185,10 @@ function mergeRawConventionsConfig(
 		),
 		notes: concatArrays(globalConfig?.notes, projectConfig?.notes),
 		policies: {
-			structure: mergeStructurePolicy(
+			structure: mergeFieldsPolicy(
 				globalConfig?.policies?.structure,
 				projectConfig?.policies?.structure,
+				["forbiddenSegments", "layers", "legacyZones", "notes"],
 			),
 			naming: mergeRulePolicy(
 				globalConfig?.policies?.naming,
@@ -217,9 +210,10 @@ function mergeRawConventionsConfig(
 				projectConfig?.policies?.dependencies,
 				"rules",
 			),
-			package: mergePackagePolicy(
+			package: mergeFieldsPolicy(
 				globalConfig?.policies?.package,
 				projectConfig?.policies?.package,
+				["manifests", "requireFields", "requireFiles", "notes"],
 			),
 			files: mergeRulePolicy(
 				globalConfig?.policies?.files,
@@ -230,50 +224,19 @@ function mergeRawConventionsConfig(
 	};
 }
 
-function mergePackagePolicy(
+function mergeFieldsPolicy(
 	globalPolicy: unknown,
 	projectPolicy: unknown,
+	arrayFields: string[],
 ): any {
-	const globalRecord = asRecord(globalPolicy);
-	const projectRecord = asRecord(projectPolicy);
-	if (!globalRecord && !projectRecord) return undefined;
-	return {
-		...globalRecord,
-		...projectRecord,
-		manifests: concatArrays(globalRecord?.manifests, projectRecord?.manifests),
-		requireFields: concatArrays(
-			globalRecord?.requireFields,
-			projectRecord?.requireFields,
-		),
-		requireFiles: concatArrays(
-			globalRecord?.requireFiles,
-			projectRecord?.requireFiles,
-		),
-		notes: concatArrays(globalRecord?.notes, projectRecord?.notes),
-	};
-}
-
-function mergeStructurePolicy(
-	globalPolicy: unknown,
-	projectPolicy: unknown,
-): any {
-	const globalRecord = asRecord(globalPolicy);
-	const projectRecord = asRecord(projectPolicy);
-	if (!globalRecord && !projectRecord) return undefined;
-	return {
-		...globalRecord,
-		...projectRecord,
-		forbiddenSegments: concatArrays(
-			globalRecord?.forbiddenSegments,
-			projectRecord?.forbiddenSegments,
-		),
-		layers: concatArrays(globalRecord?.layers, projectRecord?.layers),
-		legacyZones: concatArrays(
-			globalRecord?.legacyZones,
-			projectRecord?.legacyZones,
-		),
-		notes: concatArrays(globalRecord?.notes, projectRecord?.notes),
-	};
+	const g = asRecord(globalPolicy);
+	const p = asRecord(projectPolicy);
+	if (!g && !p) return undefined;
+	const merged: Record<string, unknown> = { ...g, ...p };
+	for (const field of arrayFields) {
+		merged[field] = concatArrays(g?.[field], p?.[field]);
+	}
+	return merged;
 }
 
 function mergeRulePolicy(

@@ -5,7 +5,7 @@ import {
 	matchesAnyPathPattern,
 	type PathPattern,
 } from "../core/pattern.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 export interface LeadingBlockComment {
 	line: number;
@@ -170,12 +170,7 @@ const HEADER_LINE_LIMIT = 20;
 export function normalizeDocumentationPolicy(
 	raw: RawDocumentationPolicyConfig | undefined,
 ): DocumentationPolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 
 	const candidate = raw ?? {};
 	const mode = parseMode(candidate.mode, DEFAULT_MODE);
@@ -235,62 +230,7 @@ export function evaluateDocumentationViolation(
 	return undefined;
 }
 
-export function buildDocumentationPromptLines(
-	config: DocumentationPolicyConfig,
-): string[] {
-	const lines = [
-		`Default new-file mode: ${config.mode}.`,
-		`Default existing-file edit mode: ${config.editMode}.`,
-		"Documentation checks are deterministic and additive.",
-	];
 
-	lines.push("", "Documentation rules:");
-	for (const rule of config.rules) {
-		if (rule.kind === "requireTsdocOnExports") {
-			const remarks = rule.requireRemarks ? "; require @remarks" : "";
-			lines.push(
-				`- ${rule.paths.join(", ")} -> require TSDoc on exported ${rule.declarations.join(", ")}${remarks}.`,
-			);
-		} else if (rule.kind === "requireFileOverview") {
-			const sections =
-				rule.requiredSections.length > 0
-					? ` with ${rule.requiredSections.join(", ")}`
-					: "";
-			const optional =
-				rule.optionalSections.length > 0
-					? ` Optional: ${rule.optionalSections.join(", ")}.`
-					: "";
-			lines.push(
-				`- ${rule.paths.join(", ")} -> require leading @fileoverview${sections}.${optional}`,
-			);
-		} else if (rule.kind === "forbidFileHeaders") {
-			lines.push(
-				`- ${rule.paths.join(", ")} -> forbid blanket file headers matching ${rule.patterns.join(", ")}.`,
-			);
-		} else if (rule.kind === "forbidCommentPatterns") {
-			lines.push(
-				`- ${rule.paths.join(", ")} -> forbid comments matching ${rule.patterns.join(", ")}.`,
-			);
-		} else if (rule.kind === "todoFormat") {
-			lines.push(
-				`- ${rule.paths.join(", ")} -> require TODO/FIXME comments in ${rule.format} format.`,
-			);
-		} else {
-			lines.push(
-				`- ${rule.paths.join(", ")} -> require rationale comments with ${rule.commentKeywords.join(", ")}.`,
-			);
-		}
-	}
-
-	if (config.notes.length > 0) {
-		lines.push("", "Documentation notes:");
-		for (const note of config.notes) {
-			lines.push(`- ${note}`);
-		}
-	}
-
-	return lines;
-}
 
 function normalizeRule(
 	rule: RawDocumentationRule,
@@ -310,10 +250,7 @@ function normalizeRule(
 	);
 	const pathMatchers = compilePathPatterns(paths);
 	if (!kind || paths.length === 0) return undefined;
-	const id =
-		typeof rule.id === "string" && rule.id.trim().length > 0
-			? rule.id.trim()
-			: undefined;
+	const id = parseRuleId(rule.id);
 	const exclude = uniqueStrings(rule.exclude, (value) => value);
 	const excludeMatchers = compilePathPatterns(exclude);
 

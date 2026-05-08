@@ -5,6 +5,10 @@ export function parseMode(value: unknown, fallback: EnforcementMode): Enforcemen
   return value === "warn" || value === "confirm" || value === "block" ? value : fallback;
 }
 
+export function parseRuleId(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 export function uniqueStrings(
   values: readonly unknown[] | undefined,
   normalize: (value: string) => string,

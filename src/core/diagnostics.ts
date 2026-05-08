@@ -195,44 +195,22 @@ async function listChangedFiles(
 
 function parseGitStatus(stdout: string): string[] {
 	const entries = stdout.split("\0");
-	const paths: string[] = [];
-	const seen = new Set<string>();
+	const paths = new Set<string>();
 	let i = 0;
 	while (i < entries.length) {
-		const entry = entries[i];
-		if (!entry) {
-			i++;
-			continue;
-		}
-		const xy = entry.slice(0, 2);
+		const entry = entries[i++];
+		if (!entry) continue;
+		const [staged, unstaged] = entry;
 		const pathPart = entry.slice(3);
-		const staged = xy[0];
-		const unstaged = xy[1];
 		const isRename = staged === "R" || unstaged === "R";
 		const isDelete =
 			(staged === "D" && unstaged !== "M") ||
 			(unstaged === "D" && staged === " ");
-		if (isRename) {
-			// porcelain v1 -z encodes renames as `XY new\0old\0`; new is current.
-			i += 2;
-			if (!isDelete) {
-				const normalized = normalizeRelativePath(pathPart);
-				if (!seen.has(normalized)) {
-					seen.add(normalized);
-					paths.push(normalized);
-				}
-			}
-			continue;
-		}
-		i++;
-		if (isDelete) continue;
-		const normalized = normalizeRelativePath(pathPart);
-		if (!seen.has(normalized)) {
-			seen.add(normalized);
-			paths.push(normalized);
-		}
+		// porcelain v1 -z encodes renames as `XY new\0old\0`; consume the old path.
+		if (isRename) i++;
+		if (!isDelete) paths.add(normalizeRelativePath(pathPart));
 	}
-	return paths;
+	return [...paths];
 }
 
 async function listAuditFiles(

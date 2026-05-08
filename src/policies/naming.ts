@@ -1,7 +1,7 @@
 /** @fileoverview Naming policy normalization and evaluation. */
 import { normalizePrefix } from "../core/path.ts";
 import { compilePathPatterns, matchesAnyPathPattern } from "../core/pattern.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export type NamingPathKind = "file" | "directory";
@@ -65,12 +65,7 @@ const VALID_CASE_STYLES: NamingCaseStyle[] = [
 export function normalizeNamingPolicy(
 	raw: RawNamingPolicyConfig | undefined,
 ): NamingPolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 
 	const candidate = raw ?? {};
 	const mode = parseMode(candidate.mode, DEFAULT_MODE);
@@ -99,9 +94,7 @@ export function normalizeNamingPolicy(
 
 			return {
 				id:
-					typeof rule.id === "string" && rule.id.trim().length > 0
-						? rule.id.trim()
-						: undefined,
+					parseRuleId(rule.id),
 				exclude,
 				excludeMatchers: compilePathPatterns(exclude),
 				prefixes,
@@ -185,41 +178,7 @@ export function evaluateNamingViolation(
 	return undefined;
 }
 
-export function buildNamingPromptLines(config: NamingPolicyConfig): string[] {
-	const lines = [
-		`Default new-file mode: ${config.mode}.`,
-		`Default existing-file edit mode: ${config.editMode}.`,
-	];
 
-	lines.push("", "Naming rules:");
-	for (const rule of config.rules) {
-		const checks: string[] = [];
-		if (rule.requireCase) {
-			checks.push(`require ${rule.requireCase}`);
-		}
-		if (rule.forbiddenNames.size > 0) {
-			checks.push(`forbid names ${[...rule.forbiddenNames].join(", ")}`);
-		}
-		if (rule.extensions.length > 0) {
-			checks.push(`extensions ${rule.extensions.join(", ")}`);
-		}
-		lines.push(
-			`- ${rule.prefixes.join(", ")} -> ${rule.pathKinds.join("+")} (${checks.join("; ")})`,
-		);
-		if (rule.reason) {
-			lines.push(`  reason: ${rule.reason}`);
-		}
-	}
-
-	if (config.notes.length > 0) {
-		lines.push("", "Naming notes:");
-		for (const note of config.notes) {
-			lines.push(`- ${note}`);
-		}
-	}
-
-	return lines;
-}
 
 function buildNamingIssue(
 	name: string,

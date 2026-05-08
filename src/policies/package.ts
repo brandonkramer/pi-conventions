@@ -6,7 +6,7 @@ import {
 	matchesAnyPathPattern,
 	type PathPattern,
 } from "../core/pattern.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawPackagePiSection {
@@ -51,12 +51,7 @@ const DEFAULT_MANIFESTS = ["package.json"];
 export function normalizePackagePolicy(
 	raw: RawPackagePolicyConfig | undefined,
 ): PackagePolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 
 	const candidate = raw ?? {};
 	const manifests = uniqueStrings(candidate.manifests, (value) => value);
@@ -91,9 +86,7 @@ export function normalizePackagePolicy(
 		manifests.length > 0 ? manifests : DEFAULT_MANIFESTS;
 	return {
 		id:
-			typeof candidate.id === "string" && candidate.id.trim().length > 0
-				? candidate.id.trim()
-				: undefined,
+			parseRuleId(candidate.id),
 		mode: parseMode(candidate.mode, DEFAULT_MODE),
 		editMode: parseMode(candidate.editMode, DEFAULT_EDIT_MODE),
 		manifests: effectiveManifests,
@@ -226,25 +219,7 @@ export function evaluatePackageViolation(
 	return undefined;
 }
 
-export function buildPackagePromptLines(config: PackagePolicyConfig): string[] {
-	const lines: string[] = [
-		`Package policy: create ${config.mode}; edit ${config.editMode}.`,
-	];
-	const checks: string[] = [];
-	if (config.requireFields.length > 0)
-		checks.push(`fields ${config.requireFields.join(",")}`);
-	if (config.requireFiles.length > 0)
-		checks.push(`files ${config.requireFiles.join(",")}`);
-	if (config.piRequireKeyword)
-		checks.push(`keyword ${config.piRequireKeyword}`);
-	if (config.piVerifyResourcePaths) checks.push("verify pi resource paths");
-	if (config.npmRequireFilesCoverage.length > 0)
-		checks.push(`files coverage ${config.npmRequireFilesCoverage.join(",")}`);
-	if (checks.length > 0) {
-		lines.push(`- ${config.manifests.join(",")}: ${checks.join("; ")}`);
-	}
-	return lines;
-}
+
 
 function buildViolation(
 	config: PackagePolicyConfig,

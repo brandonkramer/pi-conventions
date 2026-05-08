@@ -1,6 +1,6 @@
 /** @fileoverview Structure policy normalization and evaluation. */
 import { normalizePrefix, normalizeRelativePath } from "../core/path.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawStructureLayer {
@@ -84,12 +84,7 @@ const DEFAULT_TOP_LEVEL_EXTENSIONS = [
 export function normalizeStructurePolicy(
 	raw: RawStructurePolicyConfig | undefined,
 ): StructurePolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 
 	const candidate = raw ?? {};
 	const mode = parseMode(candidate.mode, DEFAULT_MODE);
@@ -126,9 +121,7 @@ export function normalizeStructurePolicy(
 			}
 			return {
 				id:
-					typeof zone.id === "string" && zone.id.trim().length > 0
-						? zone.id.trim()
-						: undefined,
+					parseRuleId(zone.id),
 				prefixes,
 				reason: zone.reason.trim(),
 				onCreate: parseMode(zone.onCreate, mode),
@@ -213,61 +206,7 @@ export function evaluateStructureViolation(
 	return undefined;
 }
 
-export function buildStructurePromptLines(
-	config: StructurePolicyConfig,
-): string[] {
-	const lines = [
-		`Default new-file mode: ${config.mode}.`,
-		`Default existing-file edit mode: ${config.editMode}.`,
-	];
 
-	if (config.layers.length > 0) {
-		lines.push("", "Declared architecture zones:");
-		for (const layer of config.layers) {
-			const description = layer.description ? ` — ${layer.description}` : "";
-			lines.push(`- ${layer.name}: ${layer.prefixes.join(", ")}${description}`);
-		}
-	}
-
-	if (config.forbiddenSegments.length > 0) {
-		lines.push(
-			"",
-			`Avoid creating catch-all path segments: ${config.forbiddenSegments.join(", ")}.`,
-		);
-	}
-
-	if (config.legacyZones.length > 0) {
-		lines.push("", "Legacy zones that should not grow with new files:");
-		for (const zone of config.legacyZones) {
-			lines.push(
-				`- ${zone.prefixes.join(", ")} -> create: ${zone.onCreate}, edit: ${zone.onEdit}. ${zone.reason}`,
-			);
-		}
-	}
-
-	if (config.newTopLevelFiles.enabled) {
-		const allowedRootFiles = [...config.newTopLevelFiles.allowedFiles];
-		if (allowedRootFiles.length > 0) {
-			lines.push(
-				"",
-				`Allowed top-level source files: ${allowedRootFiles.join(", ")}.`,
-			);
-		}
-		lines.push(
-			"",
-			"Do not create new top-level source files when a declared architecture zone is a better fit.",
-		);
-	}
-
-	if (config.notes.length > 0) {
-		lines.push("", "Structure notes:");
-		for (const note of config.notes) {
-			lines.push(`- ${note}`);
-		}
-	}
-
-	return lines;
-}
 
 function isUnderSourceRoot(
 	relativePath: string,

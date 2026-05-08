@@ -5,7 +5,7 @@ import {
 	matchesAnyPathPattern,
 	type PathPattern,
 } from "../core/pattern.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawSizeLimit {
@@ -58,12 +58,7 @@ const DEFAULT_EDIT_MODE: EnforcementMode = "warn";
 export function normalizeSizePolicy(
 	raw: RawSizePolicyConfig | undefined,
 ): SizePolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 
 	const candidate = raw ?? {};
 	const mode = parseMode(candidate.mode, DEFAULT_MODE);
@@ -112,40 +107,7 @@ export function evaluateSizeViolation(
 	return undefined;
 }
 
-export function buildSizePromptLines(config: SizePolicyConfig): string[] {
-	const lines = [
-		`Default new-file mode: ${config.mode}. Individual inherited limits may keep stricter modes from their source config.`,
-		`Default existing-file edit mode: ${config.editMode}.`,
-		"Size checks run only when file content is available.",
-		"",
-		"Size limits:",
-	];
 
-	for (const limit of config.limits) {
-		const checks: string[] = [];
-		if (limit.maxLines !== undefined)
-			checks.push(`max ${limit.maxLines} lines`);
-		if (limit.maxBytes !== undefined)
-			checks.push(`max ${limit.maxBytes} bytes`);
-		if (limit.extensions.length > 0)
-			checks.push(`extensions ${limit.extensions.join(", ")}`);
-		lines.push(
-			`- ${limit.prefixes.join(", ")} -> ${checks.join("; ")} (create: ${limit.onCreate}, edit: ${limit.onEdit})`,
-		);
-		if (limit.reason) {
-			lines.push(`  reason: ${limit.reason}`);
-		}
-	}
-
-	if (config.notes.length > 0) {
-		lines.push("", "Size notes:");
-		for (const note of config.notes) {
-			lines.push(`- ${note}`);
-		}
-	}
-
-	return lines;
-}
 
 function normalizeLimit(
 	raw: RawSizeLimit,
@@ -167,9 +129,7 @@ function normalizeLimit(
 	const exclude = uniqueStrings(raw.exclude, (value) => value);
 	return {
 		id:
-			typeof raw.id === "string" && raw.id.trim().length > 0
-				? raw.id.trim()
-				: undefined,
+			parseRuleId(raw.id),
 		exclude,
 		excludeMatchers: compilePathPatterns(exclude),
 		prefixes,

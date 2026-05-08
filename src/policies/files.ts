@@ -7,7 +7,7 @@ import {
 	matchesAnyPathPattern,
 	type PathPattern,
 } from "../core/pattern.ts";
-import { parseMode, uniqueStrings } from "../core/strings.ts";
+import { parseMode, parseRuleId, uniqueStrings } from "../core/strings.ts";
 import type { EnforcementMode, Violation } from "../core/types.ts";
 
 export interface RawFilesRule {
@@ -57,12 +57,7 @@ const DEFAULT_EDIT_MODE: EnforcementMode = "warn";
 export function normalizeFilesPolicy(
 	raw: RawFilesPolicyConfig | undefined,
 ): FilesPolicyConfig | undefined {
-	if (
-		raw !== undefined &&
-		(typeof raw !== "object" || raw === null || Array.isArray(raw))
-	) {
-		return undefined;
-	}
+	if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) return undefined;
 	const candidate = raw ?? {};
 	const mode = parseMode(candidate.mode, DEFAULT_MODE);
 	const editMode = parseMode(candidate.editMode, DEFAULT_EDIT_MODE);
@@ -148,44 +143,14 @@ export function evaluateFilesGlobalRequireFindings(
 	return findings;
 }
 
-export function buildFilesPromptLines(config: FilesPolicyConfig): string[] {
-	const lines = [
-		`Default new-file mode: ${config.mode}.`,
-		`Default existing-file edit mode: ${config.editMode}.`,
-		"",
-		"File rules:",
-	];
-	for (const rule of config.rules) {
-		if (rule.require.length > 0) {
-			lines.push(`- require: ${rule.require.join(", ")}`);
-		}
-		if (rule.forbid.length > 0) {
-			lines.push(`- forbid: ${rule.forbid.join(", ")}`);
-		}
-		if (rule.source.length > 0 && rule.requireAny.length > 0) {
-			const exclude =
-				rule.exclude.length > 0 ? ` (exclude ${rule.exclude.join(", ")})` : "";
-			lines.push(
-				`- ${rule.source.join(", ")}${exclude} -> requireAny ${rule.requireAny.join(", ")}`,
-			);
-		}
-		if (rule.reason) lines.push(`  reason: ${rule.reason}`);
-	}
-	if (config.notes.length > 0) {
-		lines.push("", "Files notes:");
-		for (const note of config.notes) lines.push(`- ${note}`);
-	}
-	return lines;
-}
+
 
 function normalizeRule(
 	raw: RawFilesRule,
 	mode: EnforcementMode,
 	editMode: EnforcementMode,
 ): FilesRule | undefined {
-	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-		return undefined;
-	}
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
 	const source = uniqueStrings(raw.source, normalizeRelativePath);
 	const exclude = uniqueStrings(raw.exclude, normalizeRelativePath);
 	const requireAny = uniqueStrings(raw.requireAny, (value) => value);
@@ -199,9 +164,7 @@ function normalizeRule(
 
 	return {
 		id:
-			typeof raw.id === "string" && raw.id.trim().length > 0
-				? raw.id.trim()
-				: undefined,
+			parseRuleId(raw.id),
 		source,
 		sourceMatchers: compilePathPatterns(source),
 		exclude,

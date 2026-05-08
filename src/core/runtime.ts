@@ -232,35 +232,43 @@ async function handleCreate(
 	}
 }
 
-async function handleCheck(
-	rawTarget: string,
-	cwd: string,
-	state: LoadState,
-): Promise<{ message: string; level: "info" | "warning" | "error" }> {
+interface ParsedArgs {
+	flags: Set<string>;
+	policy?: string;
+	positional: string[];
+	unknown: string[];
+}
+
+function parseArgs(rawTarget: string, allowedFlags: string[]): ParsedArgs {
 	const tokens = rawTarget.split(/\s+/).filter(Boolean);
-	const json = tokens.includes("--json");
+	const flags = new Set<string>();
 	let policy: string | undefined;
 	const positional: string[] = [];
+	const unknown: string[] = [];
 	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (token === "--json") continue;
-		if (token === "--policy") {
+		const t = tokens[i];
+		if (allowedFlags.includes(t)) {
+			flags.add(t);
+			continue;
+		}
+		if (t === "--policy") {
 			policy = tokens[++i];
 			continue;
 		}
-		if (token.startsWith("--policy=")) {
-			policy = token.slice("--policy=".length);
+		if (t.startsWith("--policy=")) {
+			policy = t.slice("--policy=".length);
 			continue;
 		}
-		positional.push(token);
+		if (t.startsWith("--")) unknown.push(t);
+		else positional.push(t);
 	}
-	const target = positional[0];
-	if (!target) {
-		return {
-			message: "Usage: /conventions check <path> [--json] [--policy <name>]",
-			level: "warning",
-		};
-	}
+	return { flags, policy, positional, unknown };
+}
+
+function validatePolicyAndState(
+	state: LoadState,
+	policy: string | undefined,
+): { message: string; level: "info" | "warning" | "error" } | undefined {
 	if (state.error) return { message: state.error, level: "error" };
 	if (!state.config || !hasActivePolicies(state.config)) {
 		return {
@@ -274,10 +282,28 @@ async function handleCheck(
 			level: "warning",
 		};
 	}
+	return undefined;
+}
+
+async function handleCheck(
+	rawTarget: string,
+	cwd: string,
+	state: LoadState,
+): Promise<{ message: string; level: "info" | "warning" | "error" }> {
+	const args = parseArgs(rawTarget, ["--json"]);
+	const target = args.positional[0];
+	if (!target) {
+		return {
+			message: "Usage: /conventions check <path> [--json] [--policy <name>]",
+			level: "warning",
+		};
+	}
+	const err = validatePolicyAndState(state, args.policy);
+	if (err) return err;
 	return {
-		message: await checkConventionsPath(cwd, state.config, target, {
-			json,
-			policy,
+		message: await checkConventionsPath(cwd, state.config!, target, {
+			json: args.flags.has("--json"),
+			policy: args.policy,
 		}),
 		level: "info",
 	};
@@ -288,57 +314,27 @@ async function handleAudit(
 	cwd: string,
 	state: LoadState,
 ): Promise<{ message: string; level: "info" | "warning" | "error" }> {
-	if (state.error) return { message: state.error, level: "error" };
-	if (!state.config || !hasActivePolicies(state.config)) {
-		return {
-			message: "No active conventions policies found.",
-			level: "warning",
-		};
-	}
-	const tokens = rawTarget.split(/\s+/).filter(Boolean);
-	const includeIgnored = tokens.includes("--include-ignored");
-	const json = tokens.includes("--json");
-	const changed = tokens.includes("--changed");
-	let policy: string | undefined;
-	const unknown: string[] = [];
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (
-			token === "--include-ignored" ||
-			token === "--json" ||
-			token === "--changed"
-		)
-			continue;
-		if (token === "--policy") {
-			policy = tokens[++i];
-			continue;
-		}
-		if (token.startsWith("--policy=")) {
-			policy = token.slice("--policy=".length);
-			continue;
-		}
-		unknown.push(token);
-	}
-	if (unknown.length > 0) {
+	const args = parseArgs(rawTarget, [
+		"--include-ignored",
+		"--json",
+		"--changed",
+	]);
+	if (args.unknown.length > 0 || args.positional.length > 0) {
 		return {
 			message:
 				"Usage: /conventions audit [--include-ignored] [--changed] [--json] [--policy <name>]",
 			level: "warning",
 		};
 	}
-	if (policy && !KNOWN_POLICY_IDS.includes(policy as any)) {
-		return {
-			message: `Unknown policy '${policy}'. Known: ${KNOWN_POLICY_IDS.join(", ")}.`,
-			level: "warning",
-		};
-	}
+	const err = validatePolicyAndState(state, args.policy);
+	if (err) return err;
 	try {
 		return {
-			message: await auditConventions(cwd, state.config, {
-				includeIgnored,
-				changed,
-				json,
-				policy,
+			message: await auditConventions(cwd, state.config!, {
+				includeIgnored: args.flags.has("--include-ignored"),
+				changed: args.flags.has("--changed"),
+				json: args.flags.has("--json"),
+				policy: args.policy,
 			}),
 			level: "info",
 		};
@@ -358,6 +354,9 @@ async function notifyCommandResult(
 		ctx.ui.notify(result.message, result.level);
 	}
 }
+
+const policyHeader = (n: string, p: { mode: string; editMode: string }) =>
+	`${n} policy: create ${p.mode}; edit ${p.editMode}.`;
 
 function buildSystemPrompt(config: ConventionsConfig): string {
 	const lines = ["## Conventions"];
@@ -387,9 +386,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.naming) {
 		const policy = config.policies.naming;
-		lines.push(
-			`Naming policy: create ${policy.mode}; edit ${policy.editMode}.`,
-		);
+		lines.push(policyHeader("Naming", policy));
 		for (const rule of policy.rules) {
 			const checks = [
 				rule.requireCase ? `case ${rule.requireCase}` : "",
@@ -408,9 +405,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.documentation) {
 		const policy = config.policies.documentation;
-		lines.push(
-			`Documentation policy: create ${policy.mode}; edit ${policy.editMode}.`,
-		);
+		lines.push(policyHeader("Documentation", policy));
 		for (const rule of policy.rules) {
 			lines.push(
 				`- ${rule.paths.join(",")}: ${documentationRuleSummary(rule)}`,
@@ -420,7 +415,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.size) {
 		const policy = config.policies.size;
-		lines.push(`Size policy: create ${policy.mode}; edit ${policy.editMode}.`);
+		lines.push(policyHeader("Size", policy));
 		for (const limit of policy.limits) {
 			const checks = [
 				limit.maxLines !== undefined ? `maxLines ${limit.maxLines}` : "",
@@ -438,9 +433,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.dependencies) {
 		const policy = config.policies.dependencies;
-		lines.push(
-			`Dependencies policy: create ${policy.mode}; edit ${policy.editMode}.`,
-		);
+		lines.push(policyHeader("Dependencies", policy));
 		for (const rule of policy.rules) {
 			const exclude =
 				rule.exclude.length > 0 ? ` except ${rule.exclude.join(",")}` : "";
@@ -466,7 +459,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.files) {
 		const policy = config.policies.files;
-		lines.push(`Files policy: create ${policy.mode}; edit ${policy.editMode}.`);
+		lines.push(policyHeader("Files", policy));
 		for (const rule of policy.rules) {
 			if (rule.require.length > 0) {
 				lines.push(`- require: ${rule.require.join(",")}`);
@@ -484,9 +477,7 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 
 	if (config.policies.package) {
 		const policy = config.policies.package;
-		lines.push(
-			`Package policy: create ${policy.mode}; edit ${policy.editMode}.`,
-		);
+		lines.push(policyHeader("Package", policy));
 		const checks: string[] = [];
 		if (policy.requireFields.length > 0)
 			checks.push(`fields ${policy.requireFields.join(",")}`);
@@ -510,38 +501,27 @@ function documentationRuleSummary(
 		ConventionsConfig["policies"]["documentation"]
 	>["rules"][number],
 ): string {
-	if (rule.kind === "requireTsdocOnExports") {
-		return `TSDoc exports ${rule.declarations.join(",")}${rule.requireRemarks ? "; @remarks" : ""}`;
+	switch (rule.kind) {
+		case "requireTsdocOnExports":
+			return `TSDoc exports ${rule.declarations.join(",")}${rule.requireRemarks ? "; @remarks" : ""}`;
+		case "requireFileOverview":
+			return `@fileoverview${rule.requiredSections.length > 0 ? `; sections ${rule.requiredSections.join(",")}` : ""}`;
+		case "forbidFileHeaders":
+			return `forbid file headers ${rule.patterns.join(",")}`;
+		case "forbidCommentPatterns":
+			return `forbid comments ${rule.patterns.join(",")}`;
+		case "todoFormat":
+			return `TODO/FIXME ${rule.format}`;
+		default:
+			return `rationale comments ${rule.commentKeywords.join(",")}`;
 	}
-	if (rule.kind === "requireFileOverview") {
-		const sections =
-			rule.requiredSections.length > 0
-				? `; sections ${rule.requiredSections.join(",")}`
-				: "";
-		return `@fileoverview${sections}`;
-	}
-	if (rule.kind === "forbidFileHeaders") {
-		return `forbid file headers ${rule.patterns.join(",")}`;
-	}
-	if (rule.kind === "forbidCommentPatterns") {
-		return `forbid comments ${rule.patterns.join(",")}`;
-	}
-	if (rule.kind === "todoFormat") {
-		return `TODO/FIXME ${rule.format}`;
-	}
-	return `rationale comments ${rule.commentKeywords.join(",")}`;
 }
 
 function activePolicySummary(config: ConventionsConfig): string {
-	const policies: string[] = [];
-	if (config.policies.structure) policies.push("structure");
-	if (config.policies.naming) policies.push("naming");
-	if (config.policies.documentation) policies.push("documentation");
-	if (config.policies.size) policies.push("size");
-	if (config.policies.dependencies) policies.push("dependencies");
-	if (config.policies.package) policies.push("package");
-	if (config.policies.files) policies.push("files");
-	return policies.length > 0 ? policies.join(", ") : "no active policies";
+	const active = Object.keys(config.policies).filter(
+		(k) => config.policies[k as keyof typeof config.policies],
+	);
+	return active.length > 0 ? active.join(", ") : "no active policies";
 }
 
 function displayConfigSources(config: ConventionsConfig): string {

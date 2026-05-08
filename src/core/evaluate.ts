@@ -41,111 +41,74 @@ export function collectViolations(
 	if (matchesAnyPathPattern(input.relativePath, config.ignoreMatchers)) {
 		return [];
 	}
-	const violations: Violation[] = [];
+	const { relativePath, exists, content, cwd } = input;
+	const { policies } = config;
+	const out: Violation[] = [];
+	const push = (v: Violation | undefined) => {
+		if (v) out.push(v);
+	};
 
-	if (config.policies.structure) {
-		const violation = evaluateStructureViolation(
-			input.relativePath,
-			input.exists,
-			config.policies.structure,
+	if (policies.structure)
+		push(evaluateStructureViolation(relativePath, exists, policies.structure));
+	if (policies.naming)
+		push(evaluateNamingViolation(relativePath, exists, policies.naming));
+	if (policies.documentation && content !== undefined)
+		push(
+			evaluateDocumentationViolation(
+				relativePath,
+				exists,
+				content,
+				policies.documentation,
+			),
 		);
-		if (violation) violations.push(violation);
-	}
-
-	if (config.policies.naming) {
-		const violation = evaluateNamingViolation(
-			input.relativePath,
-			input.exists,
-			config.policies.naming,
+	if (policies.size && content !== undefined)
+		push(evaluateSizeViolation(relativePath, exists, content, policies.size));
+	if (policies.dependencies && content !== undefined)
+		push(
+			evaluateDependenciesViolation(
+				relativePath,
+				exists,
+				content,
+				policies.dependencies,
+			),
 		);
-		if (violation) violations.push(violation);
-	}
-
-	if (config.policies.documentation && input.content !== undefined) {
-		const violation = evaluateDocumentationViolation(
-			input.relativePath,
-			input.exists,
-			input.content,
-			config.policies.documentation,
+	if (policies.package && content !== undefined)
+		push(
+			evaluatePackageViolation(
+				relativePath,
+				exists,
+				content,
+				policies.package,
+				cwd,
+			),
 		);
-		if (violation) violations.push(violation);
-	}
+	if (policies.files)
+		push(evaluateFilesViolation(relativePath, exists, policies.files, cwd));
 
-	if (config.policies.size && input.content !== undefined) {
-		const violation = evaluateSizeViolation(
-			input.relativePath,
-			input.exists,
-			input.content,
-			config.policies.size,
-		);
-		if (violation) violations.push(violation);
-	}
-
-	if (config.policies.dependencies && input.content !== undefined) {
-		const violation = evaluateDependenciesViolation(
-			input.relativePath,
-			input.exists,
-			input.content,
-			config.policies.dependencies,
-		);
-		if (violation) violations.push(violation);
-	}
-
-	if (config.policies.package && input.content !== undefined) {
-		const violation = evaluatePackageViolation(
-			input.relativePath,
-			input.exists,
-			input.content,
-			config.policies.package,
-			input.cwd,
-		);
-		if (violation) violations.push(violation);
-	}
-
-	if (config.policies.files) {
-		const violation = evaluateFilesViolation(
-			input.relativePath,
-			input.exists,
-			config.policies.files,
-			input.cwd,
-		);
-		if (violation) violations.push(violation);
-	}
-
-	return violations;
+	return out;
 }
 
 export function needsContentForPath(
 	relativePath: string,
 	config: ConventionsConfig,
 ): boolean {
+	const p = config.policies;
 	return Boolean(
-		(config.policies.documentation &&
-			documentationPolicyMatchesPath(
-				relativePath,
-				config.policies.documentation,
-			)) ||
-			(config.policies.size &&
-				sizePolicyMatchesPath(relativePath, config.policies.size)) ||
-			(config.policies.dependencies &&
-				dependenciesPolicyMatchesPath(
-					relativePath,
-					config.policies.dependencies,
-				)) ||
-			(config.policies.package &&
-				packagePolicyMatchesPath(relativePath, config.policies.package)),
+		(p.documentation &&
+			documentationPolicyMatchesPath(relativePath, p.documentation)) ||
+			(p.size && sizePolicyMatchesPath(relativePath, p.size)) ||
+			(p.dependencies &&
+				dependenciesPolicyMatchesPath(relativePath, p.dependencies)) ||
+			(p.package && packagePolicyMatchesPath(relativePath, p.package)),
 	);
 }
 
 export function strongestViolation(
 	violations: Violation[],
 ): Violation | undefined {
-	return violations.reduce<Violation | undefined>((strongest, current) => {
-		if (!strongest) {
-			return current;
-		}
-		return MODE_PRIORITY[current.mode] > MODE_PRIORITY[strongest.mode]
-			? current
-			: strongest;
-	}, undefined);
+	return violations.reduce<Violation | undefined>(
+		(s, c) =>
+			!s || MODE_PRIORITY[c.mode] > MODE_PRIORITY[s.mode] ? c : s,
+		undefined,
+	);
 }
