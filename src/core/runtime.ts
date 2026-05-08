@@ -445,9 +445,22 @@ function buildSystemPrompt(config: ConventionsConfig): string {
 			const exclude =
 				rule.exclude.length > 0 ? ` except ${rule.exclude.join(",")}` : "";
 			const reason = rule.reason ? `; ${rule.reason}` : "";
-			lines.push(
-				`- ${rule.from.join(",")}${exclude} -> no imports to ${rule.to.join(",")}; create ${rule.onCreate}; edit ${rule.onEdit}${reason}`,
-			);
+			if (rule.to.length > 0) {
+				const allow =
+					rule.allow.length > 0 ? ` allow ${rule.allow.join(",")}` : "";
+				lines.push(
+					`- ${rule.from.join(",")}${exclude} -> no imports to ${rule.to.join(",")}${allow}; create ${rule.onCreate}; edit ${rule.onEdit}${reason}`,
+				);
+			}
+			if (rule.forbidSpecifiers.length > 0) {
+				const allow =
+					rule.allowSpecifiers.length > 0
+						? ` allow ${rule.allowSpecifiers.join(",")}`
+						: "";
+				lines.push(
+					`- ${rule.from.join(",")}${exclude} -> no specifiers ${rule.forbidSpecifiers.join(",")}${allow}; create ${rule.onCreate}; edit ${rule.onEdit}${reason}`,
+				);
+			}
 		}
 	}
 

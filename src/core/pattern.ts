@@ -13,6 +13,23 @@ export function compilePathPatterns(paths: string[]): PathPattern[] {
 	}));
 }
 
+export function compileSpecifierPatterns(specifiers: string[]): PathPattern[] {
+	return specifiers.map((source) => ({
+		source,
+		matches: compileSpecifierMatcher(source),
+	}));
+}
+
+function compileSpecifierMatcher(
+	pattern: string,
+): (specifier: string) => boolean {
+	if (!hasGlobSyntax(pattern)) {
+		return (specifier) => specifier === pattern;
+	}
+	const regex = globToRegExp(pattern);
+	return (specifier) => regex.test(specifier);
+}
+
 export function matchesAnyPathPattern(
 	relativePath: string,
 	patterns: PathPattern[],

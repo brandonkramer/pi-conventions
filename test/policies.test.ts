@@ -655,6 +655,97 @@ describe("dependencies policy rule ids", () => {
 	});
 });
 
+describe("dependencies policy public/private and specifier rules", () => {
+	it("allows imports through public entrypoint with allow patterns", () => {
+		const config = normalizeDependenciesPolicy({
+			mode: "block",
+			rules: [
+				{
+					id: "features-public-api",
+					from: ["src/features/**"],
+					to: ["src/features/*/internal/**"],
+					allow: ["src/features/*/index.ts"],
+				},
+			],
+		});
+
+		const forbidden = evaluateDependenciesViolation(
+			"src/features/auth/page.ts",
+			false,
+			"import { x } from '../profile/internal/secret.js';\n",
+			config!,
+		);
+		expect(forbidden?.ruleId).toBe("features-public-api");
+
+		const allowed = evaluateDependenciesViolation(
+			"src/features/auth/page.ts",
+			false,
+			"import { x } from '../profile/index.js';\n",
+			config!,
+		);
+		expect(allowed).toBeUndefined();
+	});
+
+	it("forbids raw specifier patterns and respects allowSpecifiers", () => {
+		const config = normalizeDependenciesPolicy({
+			mode: "block",
+			rules: [
+				{
+					id: "no-deep-imports",
+					from: ["src/**"],
+					forbidSpecifiers: ["@acme/*/src/**"],
+					allowSpecifiers: ["@acme/legacy/src/compat"],
+				},
+			],
+		});
+
+		const forbidden = evaluateDependenciesViolation(
+			"src/app.ts",
+			false,
+			"import { x } from '@acme/foo/src/internal';\n",
+			config!,
+		);
+		expect(forbidden?.ruleId).toBe("no-deep-imports");
+		expect(forbidden?.reason).toContain("forbidden specifier");
+
+		const allowed = evaluateDependenciesViolation(
+			"src/app.ts",
+			false,
+			"import { x } from '@acme/legacy/src/compat';\n",
+			config!,
+		);
+		expect(allowed).toBeUndefined();
+
+		const publicEntry = evaluateDependenciesViolation(
+			"src/app.ts",
+			false,
+			"import { x } from '@acme/foo';\n",
+			config!,
+		);
+		expect(publicEntry).toBeUndefined();
+	});
+
+	it("supports a rule with only forbidSpecifiers and no to", () => {
+		const config = normalizeDependenciesPolicy({
+			rules: [
+				{
+					id: "no-internal",
+					from: ["src/**"],
+					forbidSpecifiers: ["some-pkg/internal/**"],
+				},
+			],
+		});
+		expect(config?.rules.length).toBe(1);
+		const v = evaluateDependenciesViolation(
+			"src/app.ts",
+			false,
+			"import 'some-pkg/internal/x';\n",
+			config!,
+		);
+		expect(v?.ruleId).toBe("no-internal");
+	});
+});
+
 describe("structure policy rule ids", () => {
 	it("includes legacy zone rule id in violation when configured", () => {
 		const config = normalizeStructurePolicy({

@@ -5,6 +5,7 @@ import path from "node:path";
 import { normalizeRelativePath } from "../core/path.ts";
 import {
 	compilePathPatterns,
+	compileSpecifierPatterns,
 	matchesAnyPathPattern,
 	type PathPattern,
 } from "../core/pattern.ts";
@@ -16,6 +17,9 @@ export interface RawDependencyRule {
 	from?: unknown[];
 	exclude?: unknown[];
 	to?: unknown[];
+	allow?: unknown[];
+	forbidSpecifiers?: unknown[];
+	allowSpecifiers?: unknown[];
 	reason?: unknown;
 	onCreate?: EnforcementMode;
 	onEdit?: EnforcementMode;
@@ -36,6 +40,12 @@ export interface DependencyRule {
 	excludeMatchers: PathPattern[];
 	to: string[];
 	toMatchers: PathPattern[];
+	allow: string[];
+	allowMatchers: PathPattern[];
+	forbidSpecifiers: string[];
+	forbidSpecifierMatchers: PathPattern[];
+	allowSpecifiers: string[];
+	allowSpecifierMatchers: PathPattern[];
 	reason?: string;
 	onCreate: EnforcementMode;
 	onEdit: EnforcementMode;
@@ -46,11 +56,6 @@ export interface DependenciesPolicyConfig {
 	editMode: EnforcementMode;
 	rules: DependencyRule[];
 	notes: string[];
-}
-
-interface ResolvedSpecifier {
-	specifier: string;
-	targetPath: string;
 }
 
 const DEFAULT_MODE: EnforcementMode = "warn";
@@ -96,21 +101,46 @@ export function evaluateDependenciesViolation(
 	content: string,
 	config: DependenciesPolicyConfig,
 ): Violation | undefined {
+	const specifiers = extractImportSpecifiers(content);
+	const sourceDir = path.posix.dirname(normalizeRelativePath(relativePath));
+
 	for (const rule of config.rules) {
 		if (!matchesSource(relativePath, rule)) continue;
 
-		for (const resolved of resolveRelativeSpecifiers(relativePath, content)) {
-			if (!matchesAnyPathPattern(resolved.targetPath, rule.toMatchers)) {
-				continue;
+		if (rule.toMatchers.length > 0) {
+			for (const specifier of specifiers) {
+				if (!specifier.startsWith(".")) continue;
+				const targetPath = normalizeRelativePath(
+					path.posix.normalize(path.posix.join(sourceDir, specifier)),
+				);
+				if (!matchesAnyPathPattern(targetPath, rule.toMatchers)) continue;
+				if (matchesAnyPathPattern(targetPath, rule.allowMatchers)) continue;
+				return {
+					policyId: "dependencies",
+					ruleId: rule.id,
+					mode: exists ? rule.onEdit : rule.onCreate,
+					reason:
+						rule.reason ??
+						`${relativePath} imports ${specifier} (${targetPath}), which crosses a configured dependency boundary.`,
+				};
 			}
-			return {
-				policyId: "dependencies",
-				ruleId: rule.id,
-				mode: exists ? rule.onEdit : rule.onCreate,
-				reason:
-					rule.reason ??
-					`${relativePath} imports ${resolved.specifier} (${resolved.targetPath}), which crosses a configured dependency boundary.`,
-			};
+		}
+
+		if (rule.forbidSpecifierMatchers.length > 0) {
+			for (const specifier of specifiers) {
+				if (!matchesAnyPathPattern(specifier, rule.forbidSpecifierMatchers))
+					continue;
+				if (matchesAnyPathPattern(specifier, rule.allowSpecifierMatchers))
+					continue;
+				return {
+					policyId: "dependencies",
+					ruleId: rule.id,
+					mode: exists ? rule.onEdit : rule.onCreate,
+					reason:
+						rule.reason ??
+						`${relativePath} imports '${specifier}', which matches a forbidden specifier pattern.`,
+				};
+			}
 		}
 	}
 
@@ -132,9 +162,22 @@ export function buildDependenciesPromptLines(
 	for (const rule of config.rules) {
 		const excludes =
 			rule.exclude.length > 0 ? ` except ${rule.exclude.join(", ")}` : "";
-		lines.push(
-			`- from ${rule.from.join(", ")}${excludes} MUST NOT import ${rule.to.join(", ")} (create: ${rule.onCreate}, edit: ${rule.onEdit})`,
-		);
+		if (rule.to.length > 0) {
+			const allow =
+				rule.allow.length > 0 ? ` (allow ${rule.allow.join(", ")})` : "";
+			lines.push(
+				`- from ${rule.from.join(", ")}${excludes} MUST NOT import ${rule.to.join(", ")}${allow} (create: ${rule.onCreate}, edit: ${rule.onEdit})`,
+			);
+		}
+		if (rule.forbidSpecifiers.length > 0) {
+			const allow =
+				rule.allowSpecifiers.length > 0
+					? ` (allow ${rule.allowSpecifiers.join(", ")})`
+					: "";
+			lines.push(
+				`- from ${rule.from.join(", ")}${excludes} MUST NOT match specifiers ${rule.forbidSpecifiers.join(", ")}${allow} (create: ${rule.onCreate}, edit: ${rule.onEdit})`,
+			);
+		}
 		if (rule.reason) {
 			lines.push(`  reason: ${rule.reason}`);
 		}
@@ -160,9 +203,17 @@ function normalizeRule(
 	}
 	const from = uniqueStrings(raw.from, normalizeRelativePath);
 	const to = uniqueStrings(raw.to, normalizeRelativePath);
-	if (from.length === 0 || to.length === 0) {
-		return undefined;
-	}
+	const allow = uniqueStrings(raw.allow, normalizeRelativePath);
+	const forbidSpecifiers = uniqueStrings(
+		raw.forbidSpecifiers,
+		(value) => value,
+	);
+	const allowSpecifiers = uniqueStrings(
+		raw.allowSpecifiers,
+		(value) => value,
+	);
+	if (from.length === 0) return undefined;
+	if (to.length === 0 && forbidSpecifiers.length === 0) return undefined;
 
 	const exclude = uniqueStrings(raw.exclude, normalizeRelativePath);
 	const reason = typeof raw.reason === "string" ? raw.reason.trim() : undefined;
@@ -177,6 +228,12 @@ function normalizeRule(
 		excludeMatchers: compilePathPatterns(exclude),
 		to,
 		toMatchers: compilePathPatterns(to),
+		allow,
+		allowMatchers: compilePathPatterns(allow),
+		forbidSpecifiers,
+		forbidSpecifierMatchers: compileSpecifierPatterns(forbidSpecifiers),
+		allowSpecifiers,
+		allowSpecifierMatchers: compileSpecifierPatterns(allowSpecifiers),
 		reason: reason && reason.length > 0 ? reason : undefined,
 		onCreate: parseMode(raw.onCreate, mode),
 		onEdit: parseMode(raw.onEdit, editMode),
@@ -188,21 +245,6 @@ function matchesSource(relativePath: string, rule: DependencyRule): boolean {
 		matchesAnyPathPattern(relativePath, rule.fromMatchers) &&
 		!matchesAnyPathPattern(relativePath, rule.excludeMatchers)
 	);
-}
-
-function resolveRelativeSpecifiers(
-	relativePath: string,
-	content: string,
-): ResolvedSpecifier[] {
-	const sourceDir = path.posix.dirname(normalizeRelativePath(relativePath));
-	return extractImportSpecifiers(content)
-		.filter((specifier) => specifier.startsWith("."))
-		.map((specifier) => ({
-			specifier,
-			targetPath: normalizeRelativePath(
-				path.posix.normalize(path.posix.join(sourceDir, specifier)),
-			),
-		}));
 }
 
 function extractImportSpecifiers(content: string): string[] {

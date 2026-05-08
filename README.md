@@ -108,7 +108,7 @@ Each rule/limit accepts an optional `id` (surfaced in diagnostics as `policy:id`
 
 **Size** — `maxLines` and `maxBytes` budgets, optional `ignoreBlankLines`/`ignoreCommentLines`. Useful as a split-by-responsibility nudge.
 
-**Dependencies** — lightweight relative import boundaries (`from` → `to`, with `exclude`). Scans static `import`/`export ... from` and relative dynamic imports. Does **not** do TS compiler resolution, path aliases, package export maps, call graphs, or circular dep detection. Use a linter for those.
+**Dependencies** — lightweight relative import boundaries (`from` → `to`, with `exclude`) and raw specifier patterns (`forbidSpecifiers`/`allowSpecifiers`). Each rule supports `allow` to whitelist public entrypoints (e.g. `src/features/*/index.ts`). Scans static `import`/`export ... from` and relative dynamic imports. Does **not** do TS compiler resolution, path aliases, package export maps, call graphs, or circular dep detection. Use a linter for those.
 
 **Documentation** — deterministic rules: `requireTsdocOnExports`, `requireFileOverview`, `forbidFileHeaders`, `forbidCommentPatterns`, `todoFormat`, `requireRationaleComments`.
 

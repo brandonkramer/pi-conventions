@@ -5,10 +5,24 @@
       "mode": "block",
       "rules": [
         {
+          "id": "extract.registry-only",
           "from": ["src/**/*.ts"],
           "exclude": ["src/extract/**"],
           "to": ["src/extract/verticals/**"],
           "reason": "Vertical extractors are reached through src/extract/registry.ts only."
+        },
+        {
+          "id": "features-public-api",
+          "from": ["src/features/**"],
+          "to": ["src/features/*/internal/**"],
+          "allow": ["src/features/*/index.ts"],
+          "reason": "Feature internals must be reached through the feature's public entrypoint."
+        },
+        {
+          "id": "no-workspace-deep-imports",
+          "from": ["src/**/*.ts"],
+          "forbidSpecifiers": ["@acme/*/src/**"],
+          "reason": "Import workspace packages from their public entry, not /src deep paths."
         }
       ]
     }
