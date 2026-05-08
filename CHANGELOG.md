@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0
+
+- Add `policies.files` for file relationship/existence checks (`feat`).
+  - `require` / `forbid` paths and `source` + `requireAny` pairing rules with `{stem}`/`{dir}`/`{path}` placeholders and `exclude` scoping.
+- Add `policies.package` for npm/Pi manifest hygiene (`feat`).
+  - `requireFields`, `requireFiles`, `piPackage.requireKeyword`, `piPackage.verifyResourcePaths`, `npm.requireFilesCoverage`.
+- Add `/conventions audit --changed` to scope audit to staged + unstaged + untracked Git changes (`feat`).
+  - Composes with `--json` and `--policy <name>`; rejects `--include-ignored`; clear error outside a Git repo.
+- Extend dependencies policy with public-API allow lists and raw specifier rules (`feat`).
+  - `allow` whitelist for public entrypoints; `forbidSpecifiers` / `allowSpecifiers` match raw module specifiers (e.g. `@scope/*/src/**`).
+- Add stable rule `id`s, per-rule `exclude` patterns, top-level `ignorePaths`, `--json` output, and `--policy <name>` filter to `check` and `audit` (`feat`).
+- Migrate peer dependency to `@earendil-works/pi-coding-agent` scope (`chore`).
+- Simplify source: −464 SLOC (−10.4%), same behavior, 82 tests pass (`refactor`).
+- Simplify README with command table and tighter policy summaries (`docs`).
+
 ## 0.3.0
 
 - Add dependencies policy for lightweight relative import-boundary enforcement.
